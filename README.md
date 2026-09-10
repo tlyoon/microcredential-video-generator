@@ -2,6 +2,10 @@
 
 A reusable Python pipeline for converting a structured `.docx` teaching document into short microcredential-style narrated videos.
 
+## Start here
+
+For installation, first-run setup, Gemini configuration, Chirp voice setup, Lab 101 production, use with a different DOCX/topic, review/approval, MP4 rendering, and troubleshooting, see the **[complete user manual](docs/USER_MANUAL.md)**.
+
 ## Production architecture
 
 ```text
