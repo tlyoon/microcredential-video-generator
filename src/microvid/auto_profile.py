@@ -42,8 +42,9 @@ def scaffold_profile(
                 "thinking_level": "high",
                 "api_key_env": "GEMINI_API_KEY",
                 "review_pass": True,
+                "narration_polish_pass": True,
                 "max_source_characters_per_lesson": 220000,
-                "prompt_set": "global_design_v1+microcredential_v2",
+                "prompt_set": "global_design_v1+microcredential_v3+narration_polish_v1",
                 "global_design": {
                     "enabled": True,
                     "max_source_characters": 800000,
