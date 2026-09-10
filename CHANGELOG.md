@@ -1,0 +1,50 @@
+# Changelog
+
+All notable project changes are summarized here.
+
+## 0.5.0 — Generic project identity and documentation consolidation
+
+- Standardized the project identity as **Microcredential Video Generator**.
+- Recommended GitHub repository slug changed from `physics-lab-microcredential-video-generator` to `microcredential-video-generator`.
+- Clarified that Physics Laboratory 101 is the bundled reference profile/sample, not the software's domain boundary.
+- Updated Python package description to describe the generic DOCX-to-video workflow.
+- Updated the repository publication script to default to `microcredential-video-generator`.
+- Added `docs/CONFIGURATION_REFERENCE.md`.
+- Reworked README, user manual, architecture, project status, Chirp guide, and pilot documentation to describe the current Gemini-first, Chirp-enabled pipeline consistently.
+- Documented repository-name independence and rename migration behavior.
+
+## 0.4.0 — Configurable Google Cloud Chirp 3 HD TTS
+
+- Added pluggable TTS provider architecture.
+- Added Google Cloud Chirp 3 HD as the production default.
+- Added configurable female British-English default voice `en-GB-Chirp3-HD-Leda`.
+- Retained Windows SAPI as a configurable fallback.
+- Added scientific speech normalization.
+- Added per-slide `tts_text` and `tts_replacements` support.
+- Added voice-audition workflow.
+- Added TTS provenance logging in `tts_manifest.yaml`.
+- Updated LLM prompting so narration is written as TTS-ready spoken prose.
+- Added Google Cloud Text-to-Speech dependency and regression tests.
+
+## 0.3.0 — Gemini-first lesson authoring
+
+- Added Google Gemini LLM provider through the official `google-genai` SDK.
+- Made LLM slide/narration generation the normal content-authoring path.
+- Added two-pass lesson generation plus grounded review/revision.
+- Added version-controlled prompt architecture for source fidelity, pedagogy, slide design, narration, visuals, technical integrity, provenance, and assessment.
+- Added structured per-slide narration, lecturer notes, visual direction, equations, source block IDs, and timing.
+- Embedded narration and production guidance into PowerPoint speaker notes.
+
+## 0.2.0 — Generic document/profile handling
+
+- Removed Physics-specific ranking behavior from the generic engine.
+- Added semantic heading selectors and pagination-independent source handling.
+- Added profile scaffolding for unrelated structured DOCX topics.
+- Added stale-profile detection so missing source material fails visibly.
+- Included the corrected Physics Laboratory 101 DOCX under `examples/sample_docs/` as reference/sample data only.
+
+## 0.1.0 — Initial pipeline
+
+- Added DOCX semantic extraction.
+- Added Lab 101 nine-video profile.
+- Added YAML lesson manifests, PowerPoint generation, narration assets, subtitles, QA, and initial media hooks.
