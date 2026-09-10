@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from importlib.resources import files
 from pathlib import Path
@@ -38,6 +39,13 @@ def whole_document_packet(extraction: dict) -> list[dict[str, Any]]:
     return packet
 
 
+def extraction_signature(extraction: dict) -> str:
+    """Stable digest used to reject a stale global plan after the DOCX changes."""
+    payload = whole_document_packet(extraction)
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
     concept = {
         "type": "object",
@@ -68,9 +76,19 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
             "forward_links": {"type": "array", "items": {"type": "string"}},
         },
         "required": [
-            "id", "title", "focus", "target_minutes", "max_slides",
-            "learning_outcomes", "check_question", "takeaways", "core_block_ids",
-            "reference_block_ids", "prerequisite_video_ids", "already_taught", "forward_links",
+            "id",
+            "title",
+            "focus",
+            "target_minutes",
+            "max_slides",
+            "learning_outcomes",
+            "check_question",
+            "takeaways",
+            "core_block_ids",
+            "reference_block_ids",
+            "prerequisite_video_ids",
+            "already_taught",
+            "forward_links",
         ],
         "additionalProperties": False,
     }
@@ -85,8 +103,12 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
             "editorial_flags": {"type": "array", "items": {"type": "string"}},
         },
         "required": [
-            "course_summary", "pedagogical_strategy", "concept_map", "videos",
-            "coverage_notes", "editorial_flags",
+            "course_summary",
+            "pedagogical_strategy",
+            "concept_map",
+            "videos",
+            "coverage_notes",
+            "editorial_flags",
         ],
         "additionalProperties": False,
     }
@@ -197,7 +219,13 @@ def validate_global_plan(plan: dict, extraction: dict) -> list[dict[str, Any]]:
     return issues
 
 
-def _normalize_plan(generated: dict, extraction: dict, profile: dict, provider: JSONLLMProvider, passes: int) -> dict:
+def _normalize_plan(
+    generated: dict,
+    extraction: dict,
+    profile: dict,
+    provider: JSONLLMProvider,
+    passes: int,
+) -> dict:
     issues = validate_global_plan(generated, extraction)
     errors = [x for x in issues if x.get("severity") == "error"]
     if errors:
@@ -211,6 +239,7 @@ def _normalize_plan(generated: dict, extraction: dict, profile: dict, provider: 
             "design_mode": "global_llm",
             "course_id": course.get("id"),
             "course_title": course.get("title"),
+            "source_signature": extraction_signature(extraction),
             "generation": {
                 "provider": provider.provider_name,
                 "model": provider.model,
