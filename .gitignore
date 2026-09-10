@@ -1,0 +1,25 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+build/
+dist/
+
+# Local runtime source documents. The tracked sample lives under examples/sample_docs/.
+source/*.docx
+source/*.pdf
+!source/README.md
+
+# Generated artefacts
+workspace/
+output/
+*.mp4
+*.wav
+*.mp3
+
+# Local configuration / secrets
+.env
+*.local.toml

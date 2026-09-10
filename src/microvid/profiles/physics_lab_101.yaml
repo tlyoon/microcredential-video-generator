@@ -1,0 +1,134 @@
+parser:
+  heading_style_patterns:
+    - '^Heading\s*(\d+)$'
+  use_outline_level: true
+  infer_numbered_headings: false
+  section_number_regex: '^(\d+(?:\.\d+)*)\.?\s+'
+  key_idea_patterns:
+    - '^key\s+idea\b'
+  worked_example_patterns:
+    - '^worked\s+example\b'
+    - '^example\b'
+  contrast_label_patterns:
+    - '^poor:?$'
+    - '^better:?$'
+    - '^weak:?$'
+    - '^incorrect\s+treatment:?$'
+
+course:
+  id: physics_lab_101
+  title: Physics Laboratory 101 — Experimental Measurement and Data Skills
+  audience: First-year undergraduate physics students
+  source_role: The explicitly supplied corrected Student Reference Manual is the authoritative technical source.
+  design_principle: Video teaches the reasoning; the manual carries the detail.
+  narration_wpm: 130
+  max_slides: 7
+  target_video_minutes: 6
+  target_total_minutes: 58
+  max_draft_narration_words_per_slide: 135
+  llm:
+    provider: gemini
+    model: gemini-flash-latest
+    thinking_level: high
+    api_key_env: GEMINI_API_KEY
+    review_pass: true
+    max_source_characters_per_lesson: 220000
+    prompt_set: microcredential_v2
+  content_selection:
+    priority_terms: [uncertainty, measurement, mean, standard deviation, random, systematic, slope, intercept, error analysis, propagate, graph, raw data, reference value]
+    priority_term_score: 2
+    preferred_min_chars: 40
+    preferred_max_chars: 500
+    preferred_length_score: 2
+    source_words_per_slide: 110
+    max_context_blocks: 6
+    kind_scores: {key_idea: 7, worked_example_heading: 7, table: 7, equation: 5, heading: 1}
+  editorial_policy:
+    - Do not invent scientific claims beyond the assigned source blocks.
+    - Preserve numerical values, units, equations and assumptions exactly unless explicitly reviewed.
+    - Prefer one worked example in depth over several examples superficially.
+    - Keep detailed checklists and repetitive examples as reference-only material where possible.
+
+videos:
+  - id: V01
+    title: What Does a Measurement Really Mean?
+    focus: Measurement, units, resolution and why uncertainty belongs with a result.
+    target_minutes: 5.5
+    max_slides: 7
+    core_selectors: [{heading_contains: 'The meaning of a measurement'}]
+    reference_selectors: []
+    learning_outcomes: [State a measured quantity with a unit and uncertainty., Distinguish instrument resolution from total measurement uncertainty.]
+    check_question: A stopwatch displays 0.01 s. Does that prove the timing uncertainty is 0.01 s?
+    takeaways: [A measured value is incomplete without its unit and uncertainty context., Instrument resolution is not automatically the total measurement uncertainty.]
+  - id: V02
+    title: Can You Trust Your Measurement?
+    focus: Accuracy, precision, random variation and systematic effects.
+    target_minutes: 5.75
+    max_slides: 7
+    core_selectors: [{heading_contains: 'Accuracy, precision, random effects and systematic effects'}]
+    reference_selectors: []
+    learning_outcomes: [Distinguish accuracy from precision., Distinguish random effects from systematic effects., Explain why repetition does not automatically remove systematic bias.]
+    check_question: If repeated readings agree closely but a balance has a zero offset, is the measurement accurate, precise, both, or neither?
+  - id: V03
+    title: From Raw Data to a Reliable Result
+    focus: Data integrity, repeated measurements, mean, scatter and uncertainty of the mean.
+    target_minutes: 6.5
+    max_slides: 8
+    core_selectors: [{heading_contains: 'Raw data, data integrity and the laboratory notebook'}, {heading_contains: 'Treating repeated measurements'}]
+    reference_selectors: [{heading_contains: 'Removing inconvenient data'}, {heading_contains: 'Rounding too early'}]
+    learning_outcomes: [Preserve raw observations and traceability., Treat suspected outliers scientifically., Distinguish sample standard deviation from standard uncertainty of the mean.]
+    check_question: When is it scientifically defensible to exclude an unusual repeated measurement?
+  - id: V04
+    title: Understanding Uncertainty
+    focus: Absolute, relative and percentage uncertainty; error versus uncertainty; sensible rounding.
+    target_minutes: 5.75
+    max_slides: 7
+    core_selectors: [{heading_contains: 'Absolute, relative and percentage uncertainty'}, {heading_contains: 'Measurement error versus uncertainty'}, {heading_contains: 'Significant figures and rounding'}]
+    reference_selectors: [{heading_contains: 'Correct reporting of numerical results'}, {heading_contains: 'Excessive significant figures'}, {heading_contains: 'Missing units'}]
+    learning_outcomes: [Express uncertainty in absolute, relative and percentage forms., Distinguish measurement error from uncertainty., Report values with justified significant figures.]
+    check_question: Is percentage difference from a reference value the same quantity as percentage uncertainty?
+  - id: V05
+    title: Propagation of Uncertainty
+    focus: How uncertainty moves through sums, differences, products, quotients and powers.
+    target_minutes: 7.5
+    max_slides: 8
+    core_selectors: [{heading_contains: 'Propagation of uncertainty'}]
+    reference_selectors: [{heading_contains: 'Quick-reference formula sheet'}]
+    learning_outcomes: [Propagate independent uncertainty contributions through common calculations., Recognise when relative rather than absolute uncertainty is the useful form., Interpret which input contribution matters most.]
+    check_question: If a calculated quantity depends on a squared measurement, what happens to that measurement's relative uncertainty contribution?
+  - id: V06
+    title: Finding What Limits Your Experiment
+    focus: Use a complete uncertainty budget to identify the measurement worth improving.
+    target_minutes: 5.75
+    max_slides: 7
+    core_selectors: [{heading_contains: 'Complete uncertainty example: density of a cylinder'}]
+    reference_selectors: [{heading_contains: 'Better example: cylinder density'}]
+    learning_outcomes: [Carry uncertainty through a complete density calculation., Compare uncertainty contributions quantitatively., Select an improvement based on the dominant contribution.]
+    check_question: If the balance contribution is tiny but the diameter contribution dominates, which instrument or measurement should be improved first?
+  - id: V07
+    title: Treating and Graphing Experimental Data
+    focus: Legitimate data transformation, background subtraction, error bars and physically justified linearisation.
+    target_minutes: 7.5
+    max_slides: 8
+    core_selectors: [{heading_contains: 'Correct data treatment and data manipulation'}, {heading_contains: 'Graphical data analysis'}, {path_regex: 'Data transformation and linearisation$'}]
+    reference_selectors: [{heading_contains: 'Transforming data but not uncertainty'}]
+    learning_outcomes: [Distinguish legitimate data treatment from unacceptable manipulation., Propagate uncertainty when transforming variables., Construct a graph with appropriate variables, units, error bars and model.]
+    check_question: When data are measured deliberately at different temperatures, should the values normally be averaged together?
+  - id: V08
+    title: Getting Physics from a Graph
+    focus: Extract physical meaning from a fitted slope, intercept and residuals using the pendulum example.
+    target_minutes: 6.5
+    max_slides: 8
+    core_selectors: [{heading_contains: 'Complete pendulum dataset'}, {heading_contains: 'Extracting physics from the fitted slope'}, {heading_contains: 'The physical meaning of slope, intercept and residuals'}]
+    reference_selectors: [{heading_contains: 'Complete reporting example: simple pendulum'}]
+    learning_outcomes: [Interpret the physical meaning and units of a fitted slope., Treat a non-zero intercept as evidence to investigate rather than automatically forcing zero., Use residuals to judge whether a model is adequate.]
+    check_question: Theory predicts a zero intercept, but your fitted intercept is non-zero. Should you automatically force the fit through the origin?
+  - id: V09
+    title: Discussing and Reporting an Experiment Properly
+    focus: Compare results with references, write quantitative error analysis and report conclusions scientifically.
+    target_minutes: 7.5
+    max_slides: 8
+    core_selectors: [{heading_contains: 'How to compare experiment with theory or a reference value'}, {heading_contains: 'How to write a proper error analysis'}, {heading_contains: 'Correct reporting of numerical results'}, {heading_contains: 'Correct reporting of tables and graphs'}, {heading_contains: 'Recommended laboratory report structure'}]
+    reference_selectors: [{heading_contains: 'Complete reporting example: simple pendulum'}, {heading_contains: 'Common beginner mistakes'}, {heading_contains: 'Quick-reference formula sheet'}, {heading_contains: 'Final analysis and reporting checklist'}, {heading_contains: 'Essential experimental mindset'}]
+    learning_outcomes: [Compare an experimental result with a reference relative to its uncertainty., Replace vague 'human error' statements with specific mechanisms., Write quantitative, actionable error analysis and a concise conclusion.]
+    check_question: Why is a percentage difference alone not a complete error analysis?

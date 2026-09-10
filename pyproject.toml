@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "microcredential-video-generator"
+version = "0.3.0"
+description = "DOCX-to-microcredential course pipeline for short narrated laboratory-skills videos"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "python-docx>=1.1",
+  "python-pptx>=1.0",
+  "PyYAML>=6.0",
+  "google-genai",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "ruff>=0.6"]
+windows = ["pywin32>=306"]
+
+[project.scripts]
+microvid = "microvid.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+microvid = ["profiles/*.yaml", "prompts/*.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
