@@ -1,9 +1,9 @@
 # Microcredential Video Generator
 
-A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using whole-document Gemini course design, LLM-authored slide/narration generation, PowerPoint, configurable TTS, and FFmpeg assembly.
+A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using whole-document Gemini course design, LLM-authored slide content, dedicated narration polishing, PowerPoint, configurable TTS, and FFmpeg assembly.
 
 **Repository:** `tlyoon/microcredential-video-generator`  
-**Current package version:** `0.6.0`  
+**Current package version:** `0.7.0`  
 **CLI command:** `microvid`
 
 Physics Laboratory 101 is the bundled reference implementation and sample course profile. The engine itself is topic-neutral.
@@ -12,6 +12,7 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 
 - [Complete user manual](docs/USER_MANUAL.md)
 - [Global-first design](docs/GLOBAL_DESIGN.md)
+- [Narration quality and dedicated script polishing](docs/NARRATION_QUALITY.md)
 - [Architecture and genericity contract](docs/ARCHITECTURE.md)
 - [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
 - [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
@@ -20,7 +21,7 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 
 ## Production architecture
 
-The production default is now **global-first**. Gemini sees the complete structured source document before any video boundaries or slide decks are created.
+The production default is **global-first**. Gemini sees the complete structured source document before any video boundaries or slide decks are created. Narration is subsequently treated as a separate editorial artifact rather than accepting the first script produced during slide design.
 
 ```text
 Explicit runtime DOCX
@@ -31,11 +32,14 @@ Explicit runtime DOCX
    -> global course map + video block assignments
    -> for each video:
         global map + sequence context + assigned source blocks
-        -> GEMINI slide stack + narration
-        -> LOCAL deterministic QA
-        -> GEMINI grounded lesson review/revision
+        -> GEMINI slide stack + first narration
+        -> LOCAL deterministic lesson QA
+        -> GEMINI grounded scientific/pedagogical lesson review
+        -> GEMINI dedicated narration-only polish
+        -> LOCAL narration speech/timing QA
    -> GEMINI whole-course consistency review
         -> targeted lesson revisions if needed
+        -> narration is polished again for any revised lesson
         -> final consistency verification
    -> LOCAL YAML manifests
    -> LOCAL PowerPoint decks + speaker notes
@@ -64,7 +68,19 @@ For an individual video, Gemini receives:
 - only that video's authoritative core blocks and supporting reference blocks;
 - the lesson-generation/review prompts and JSON schema.
 
-This gives Gemini global understanding without repeatedly sending the entire source for every slide-generation call.
+For the dedicated narration-polish call, Gemini additionally receives the now-fixed lesson manifest, including slide titles, on-screen content, visual directions, equations, source provenance, timing and the current narration. Its response schema allows it to return only `slide_id`, polished `narration`, and optional `tts_text`. It cannot use that pass to redesign slides or silently change the science.
+
+## Narration is a first-class production artifact
+
+The dedicated narration prompt asks Gemini to write for the ear rather than the page: continuous lecturer-like speech, natural transitions, explanation rather than bullet recitation, restrained conversational tone, visual synchronization, TTS-ready mathematical language, and realistic pacing.
+
+For most explanatory slides, the editor targets roughly 70–85% of theoretical speaking capacity:
+
+```text
+estimated_seconds * narration_wpm / 60
+```
+
+This leaves room for visual attention and pauses. The final manifest records `narration_word_count`, `narration_estimated_spoken_seconds`, optional `tts_text`, and narration-quality findings. See [NARRATION_QUALITY.md](docs/NARRATION_QUALITY.md).
 
 ## Normal first run
 
@@ -75,7 +91,7 @@ microvid all `
   --profile my_course
 ```
 
-`microvid all` now performs extraction, fresh whole-document planning, lesson generation/review, whole-course consistency review, PowerPoint generation, and validation.
+`microvid all` performs extraction, fresh whole-document planning, lesson generation/review, dedicated narration polishing, whole-course consistency review, PowerPoint generation, and validation.
 
 For a staged workflow:
 
@@ -107,7 +123,7 @@ It carries a source signature. If the extracted DOCX changes, a stale plan is re
 
 ## New topic
 
-`scaffold-profile` now creates **course/parser/LLM constraints only**. It intentionally does not guess video boundaries from Heading 1 sections.
+`scaffold-profile` creates **course/parser/LLM constraints only**. It intentionally does not guess video boundaries from Heading 1 sections.
 
 ```powershell
 microvid scaffold-profile `
@@ -131,11 +147,15 @@ course:
     model: gemini-flash-latest
     thinking_level: high
     api_key_env: GEMINI_API_KEY
+    review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
     global_design:
       max_source_characters: 800000
       max_videos: 30
 ```
+
+The narration polish is enabled by default even for older profiles that omit the field. Set `narration_polish_pass: false` only for deliberate cost/diagnostic comparisons.
 
 Set the key locally:
 
@@ -174,7 +194,7 @@ Windows SAPI remains a configurable fallback. The local media layer records the 
 
 ## Editorial gates
 
-Global Gemini consistency review happens **before slide production**. If blocking cross-course issues remain after the allowed targeted revision pass, draft manifests and review files are saved but slide generation is blocked.
+Global Gemini consistency review happens before slide production. If blocking cross-course issues remain after the allowed targeted revision pass, draft manifests and review files are saved but slide generation is blocked.
 
 Individual lesson manifests still begin with:
 
@@ -187,6 +207,8 @@ Human scientific/editorial approval remains required before final media producti
 ```yaml
 editorial_status: approved
 ```
+
+For narration specifically, audition representative lessons with the actual TTS voice before approving the full course. A polished LLM script remains subject to human judgment about scientific nuance, pace and teaching style.
 
 ## Installation
 
