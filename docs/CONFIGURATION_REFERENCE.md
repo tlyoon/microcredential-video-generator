@@ -1,8 +1,10 @@
 # Configuration Reference
 
-This document describes the configuration surfaces of **Microcredential Video Generator v0.5.0**. Runtime behavior is intentionally soft-coded: course-specific content, model choice, source selection, lesson boundaries, TTS voice, and media options should be changed through YAML or CLI options rather than by editing Python.
+This document describes the configuration surfaces of **Microcredential Video Generator v0.6.0**. The production default is whole-document Gemini course design followed by globally informed lesson generation and final whole-course consistency review.
 
 ## 1. Configuration precedence
+
+For LLM generation, the selected course profile supplies defaults and CLI options such as `--model` and `--thinking-level` override them.
 
 For TTS, settings are resolved in this order, from lowest to highest priority:
 
@@ -11,21 +13,52 @@ For TTS, settings are resolved in this order, from lowest to highest priority:
 3. standalone `--tts-config` YAML;
 4. explicit CLI overrides.
 
-For LLM generation, the course profile supplies defaults and CLI options such as `--model` and `--thinking-level` override them.
+## 2. Course profile in global mode
 
-## 2. Course profile
+A v0.6.0 global-mode profile is primarily a **constraint profile**. It should describe the audience, source role, parser behavior, timing targets, LLM settings, editorial policy, and TTS preferences. It does not need to predefine the videos.
 
-A course profile is YAML. The bundled reference profile is:
+Example:
 
-```text
-src/microvid/profiles/physics_lab_101.yaml
+```yaml
+course:
+  id: heat_transfer
+  title: Introduction to Heat Transfer
+  audience: First-year engineering students
+  source_role: The explicitly supplied DOCX is the authoritative content source.
+  design_principle: Video teaches the reasoning; the source document carries the detail.
+  narration_wpm: 130
+  max_slides: 7
+  target_video_minutes: 6
+  target_total_minutes: 55
+
+  llm:
+    provider: gemini
+    model: gemini-flash-latest
+    thinking_level: high
+    api_key_env: GEMINI_API_KEY
+    review_pass: true
+    max_source_characters_per_lesson: 220000
+    global_design:
+      enabled: true
+      max_source_characters: 800000
+      max_videos: 30
+      plan_review_pass: true
+      course_consistency_review: true
+
+parser:
+  heading_style_patterns:
+    - '^Heading\s*(\d+)$'
+  use_outline_level: true
+  infer_numbered_headings: false
+
+videos: []
 ```
 
-The Physics Lab profile is an example of a course-specific layer. The Python engine itself does not require Physics terminology.
+The empty `videos` list is deliberate in a newly scaffolded global-first profile. Gemini designs the actual lesson sequence after reading the whole extracted source.
 
-### 2.1 Parser configuration
+## 3. Parser configuration
 
-Typical parser configuration:
+Typical parser settings:
 
 ```yaml
 parser:
@@ -34,35 +67,22 @@ parser:
   use_outline_level: true
   infer_numbered_headings: false
   section_number_regex: '^(\d+(?:\.\d+)*)\.?\s+'
+  key_idea_patterns:
+    - '^key\s+idea\b'
+  worked_example_patterns:
+    - '^worked\s+example\b'
+    - '^example\b'
 ```
 
 Important behavior:
 
 - pagination is ignored;
-- heading levels and semantic breadcrumb paths are retained;
-- numeric section labels are optional metadata rather than the primary selector;
-- custom heading patterns may be supplied for non-standard Word documents;
-- Office Math provenance is retained during extraction.
+- semantic heading breadcrumb paths are retained;
+- numeric section labels are optional metadata;
+- custom heading patterns may be supplied;
+- paragraphs, tables, headings, and Office Math provenance are extracted locally.
 
-### 2.2 Course metadata
-
-Example:
-
-```yaml
-course:
-  id: physics_lab_101
-  title: Physics Laboratory 101
-  audience: First-year undergraduate physics students
-  narration_wpm: 130
-  max_slides: 7
-  target_video_minutes: 6
-```
-
-These values guide lesson construction but do not identify the software package itself.
-
-### 2.3 LLM settings
-
-Example:
+## 4. LLM settings
 
 ```yaml
 course:
@@ -75,53 +95,157 @@ course:
     max_source_characters_per_lesson: 220000
 ```
 
-`provider` selects the LLM backend. The shipped backend is Gemini.
+`provider` — shipped production adapter is Gemini.
 
-`model` is deliberately configuration data. A moving alias can be used for convenience, while a pinned model is preferable when exact reproducibility of a production build is required.
+`model` — deliberately configuration data; use a moving alias for convenience or pin a supported model for reproducibility.
 
-`thinking_level` controls the configured reasoning effort where supported.
+`thinking_level` — configured reasoning effort where supported.
 
-`api_key_env` identifies the environment variable containing the Gemini API key. Credentials must not be committed to Git.
+`api_key_env` — environment variable containing the Gemini API key.
 
-`review_pass` enables the default two-pass workflow: generation followed by an independent grounded review/revision.
+`review_pass` — normal lesson generation uses a generation pass followed by a grounded lesson review/revision pass.
 
-### 2.4 Content-selection settings
+`max_source_characters_per_lesson` — fail-visible upper bound for an individual lesson source packet. The package does not silently truncate a lesson packet.
 
-Course profiles may define ranking and compression rules such as:
+## 5. Global-design settings
 
 ```yaml
 course:
-  content_selection:
-    priority_terms:
-      - uncertainty
-      - measurement
-      - graph
-    priority_term_score: 2
-    preferred_min_chars: 40
-    preferred_max_chars: 500
-    source_words_per_slide: 110
-    max_context_blocks: 6
+  llm:
+    global_design:
+      enabled: true
+      max_source_characters: 800000
+      max_videos: 30
+      plan_review_pass: true
+      course_consistency_review: true
 ```
 
-These terms belong to the course profile, not the engine. A different discipline should supply its own terms.
+`enabled` — documents intended global-first behavior. The CLI production default is global even when this key is omitted; use `--design-mode profile` only when deliberately requesting legacy profile segmentation.
 
-### 2.5 Lesson definitions
+`max_source_characters` — upper bound for the complete prompt-facing structured extraction sent during whole-document planning. Exceeding it causes a visible failure rather than truncation.
 
-A lesson may use semantic source selectors:
+`max_videos` — upper bound exposed to the global course-plan JSON schema.
+
+`plan_review_pass` — policy marker for the expected second whole-document planning pass. CLI option `--no-plan-review-pass` can deliberately disable that pass for development/cost testing.
+
+`course_consistency_review` — policy marker for the final cross-lesson review. CLI option `--no-global-consistency-review` can deliberately disable it.
+
+## 6. Global plan output
+
+The reviewed plan is stored at:
+
+```text
+workspace/<course>/plans/course_plan.yaml
+```
+
+Important fields include:
+
+```yaml
+design_mode: global_llm
+source_signature: <sha256>
+course_summary: ...
+pedagogical_strategy: ...
+concept_map: [...]
+videos:
+  - id: V01
+    title: ...
+    focus: ...
+    target_minutes: 6
+    max_slides: 7
+    learning_outcomes: [...]
+    check_question: ...
+    takeaways: [...]
+    core_block_ids: [...]
+    reference_block_ids: [...]
+    prerequisite_video_ids: [...]
+    already_taught: [...]
+    forward_links: [...]
+```
+
+The `source_signature` is computed from the complete prompt-facing extraction. A plan is reusable only when the current extraction has the same signature.
+
+## 7. Global-design CLI controls
+
+Normal global planning after extraction:
+
+```powershell
+microvid plan `
+  --workspace ".\workspace\course" `
+  --profile my_course
+```
+
+Force a fresh global plan during staged drafting:
+
+```powershell
+microvid draft `
+  --workspace ".\workspace\course" `
+  --profile my_course `
+  --replan
+```
+
+One-command builds replan by default. Reuse is allowed only when the existing plan exactly matches the current extraction:
+
+```powershell
+microvid all ... --reuse-plan
+```
+
+Development/cost overrides:
+
+```text
+--no-plan-review-pass
+--no-review-pass
+--no-global-consistency-review
+```
+
+Compatibility path using locally predefined `videos`:
+
+```text
+--design-mode profile
+```
+
+Deterministic generation requires profile mode:
+
+```text
+--generator deterministic --design-mode profile
+```
+
+## 8. Legacy/profile-mode lesson definitions
+
+Existing course profiles may still contain lesson definitions such as:
 
 ```yaml
 videos:
   - id: V05
     title: Propagation of Uncertainty
-    target_minutes: 7
-    max_slides: 8
     core_selectors:
       - heading_contains: "Propagation of uncertainty"
 ```
 
-Semantic selectors are preferred over fixed page numbers and brittle section-number ranges. Renumbering a heading should not normally break a semantic selector. If a required topic disappears or is materially renamed, the pipeline should fail visibly rather than silently substitute unrelated material.
+These definitions are ignored by normal global mode. They are used only when `--design-mode profile` is requested or by deterministic legacy/debug generation.
 
-## 3. Standalone TTS configuration
+This preserves backward compatibility without allowing old hand-authored segmentation to constrain the new production design.
+
+## 9. Whole-course consistency review
+
+Global builds create:
+
+```text
+workspace/<course>/manifests/global_consistency_initial.yaml
+workspace/<course>/manifests/global_consistency_final.yaml
+```
+
+Possible status values are:
+
+```text
+ready
+revision_required
+```
+
+The initial review may issue targeted revision instructions for one or more videos. Those lessons are regenerated using their assigned source blocks plus global context. A final verification is then performed.
+
+If blocking issues remain, normal `microvid slides` is blocked. `--allow-unreviewed-course` exists only as a diagnostic override.
+
+## 10. Standalone TTS configuration
 
 Example file:
 
@@ -148,31 +272,23 @@ tts:
     - en-GB-Chirp3-HD-Kore
 ```
 
-### 3.1 TTS fields
-
 `provider` — currently `google_cloud_chirp3` or `sapi`.
 
-`language_code` — locale passed to the TTS provider, for example `en-GB`.
+`language_code` — locale passed to the provider.
 
 `voice_name` — provider-specific voice identifier.
 
-`audio_encoding` — Google Cloud output encoding. The default `LINEAR16` produces WAV output in the package.
+`audio_encoding` — Cloud TTS output encoding; default `LINEAR16` produces WAV output.
 
-`speaking_rate` — configured speaking pace.
+`speaking_rate` — narration pace.
 
-`location` — Google Cloud Text-to-Speech endpoint location. `global` uses the default endpoint.
+`location` — Cloud TTS endpoint location.
 
-`normalize_scientific_speech` — enables conservative conversion of common scientific notation before synthesis.
+`normalize_scientific_speech` — enables conservative scientific-symbol/unit normalization.
 
-`fallback_provider` — secondary provider attempted when the primary provider fails.
+`fallback_provider` / `fallback_on_error` — optional secondary TTS behavior. For final production, `--no-tts-fallback` is recommended when voice consistency is essential.
 
-`fallback_on_error` — whether fallback is permitted. For final production, `--no-tts-fallback` is recommended when voice consistency must be guaranteed.
-
-`audition_voices` — voices used by `microvid tts-audition` when no explicit `--voice` options are supplied.
-
-## 4. Per-slide TTS overrides
-
-A lesson manifest may provide a specific spoken rendering:
+## 11. Per-slide TTS overrides
 
 ```yaml
 narration: >
@@ -185,97 +301,29 @@ tts_text: >
   g equals four pi squared divided by the fitted slope.
 ```
 
-`tts_text` affects speech only. It does not replace the human-readable narration or on-screen equation.
+`tts_text` affects speech only. A small `tts_replacements` mapping may also be supplied for local pronunciation corrections.
 
-A small local pronunciation replacement mapping may also be supplied:
+## 12. Credentials
 
-```yaml
-tts_replacements:
-  "u_xbar": "standard uncertainty of the mean"
-```
-
-Use explicit overrides for expressions whose correct spoken form cannot be inferred reliably from plain text.
-
-## 5. CLI overrides
-
-### LLM
-
-```powershell
-microvid draft `
-  --workspace ".\workspace\course" `
-  --profile my_course `
-  --model "MODEL_NAME" `
-  --thinking-level high
-```
-
-### TTS provider
-
-```powershell
-microvid media `
-  --workspace ".\workspace\course" `
-  --video V01 `
-  --tts-provider google_cloud_chirp3
-```
-
-### Voice
-
-```powershell
-microvid media `
-  --workspace ".\workspace\course" `
-  --video V01 `
-  --voice-name en-GB-Chirp3-HD-Aoede
-```
-
-### Speaking rate
-
-```powershell
-microvid media `
-  --workspace ".\workspace\course" `
-  --video V01 `
-  --speaking-rate 0.95
-```
-
-### Disable fallback
-
-```powershell
-microvid media `
-  --workspace ".\workspace\course" `
-  --video V01 `
-  --no-tts-fallback
-```
-
-## 6. Environment variables and credentials
-
-Gemini authoring normally requires:
+Gemini:
 
 ```powershell
 $env:GEMINI_API_KEY = "..."
 ```
 
-Google Cloud Chirp normally uses Application Default Credentials. A common local setup is:
+Google Cloud Chirp normally uses Application Default Credentials:
 
 ```powershell
 gcloud auth application-default login
 ```
 
-Do not commit API keys, OAuth tokens, service-account JSON files, or other credentials.
+Do not commit API keys, OAuth tokens, service-account JSON, or other credentials.
 
-## 7. Runtime source selection
+## 13. Runtime source and workspace isolation
 
-Every production build requires an explicit source path:
+Every build requires an explicit source path. The bundled sample DOCX is never selected automatically.
 
-```powershell
-microvid all `
-  --source ".\source\course.docx" `
-  --workspace ".\workspace\course" `
-  --profile my_course
-```
-
-The sample DOCX under `examples/sample_docs/` is not used unless the user explicitly passes its path.
-
-## 8. Workspace isolation
-
-Use a different workspace for each course or source revision:
+Use a separate workspace for each course/source revision when practical:
 
 ```text
 workspace/
@@ -284,18 +332,4 @@ workspace/
   optics_2027/
 ```
 
-This prevents manifests, slide decks, TTS output, and MP4s from unrelated projects from being mixed.
-
-## 9. Editorial status
-
-The media stage expects explicit approval:
-
-```yaml
-editorial_status: approved
-```
-
-Use `--allow-draft` only for private previews. It should not be treated as a substitute for scientific/editorial review.
-
-## 10. Repository-name independence
-
-The Python distribution is `microcredential-video-generator`, and the CLI is `microvid`. Runtime code does not depend on the GitHub repository slug. Internal documentation uses relative paths wherever possible. Renaming the GitHub repository therefore does not require changing source code or local workspace formats.
+This keeps plans, manifests, slides, audio, and final media isolated.

@@ -14,6 +14,8 @@ course:
   narration_wpm: 130
   max_slides: 7
   target_video_minutes: 6
+  target_total_minutes: null
+
   llm:
     provider: gemini
     model: gemini-flash-latest
@@ -21,20 +23,19 @@ course:
     api_key_env: GEMINI_API_KEY
     review_pass: true
     max_source_characters_per_lesson: 220000
-    prompt_set: microcredential_v2
+    prompt_set: global_design_v1+microcredential_v2
+    global_design:
+      enabled: true
+      max_source_characters: 800000
+      max_videos: 30
+      plan_review_pass: true
+      course_consistency_review: true
+
   content_selection:
     priority_terms: []
     source_words_per_slide: 110
     max_context_blocks: 6
 
-videos:
-  - id: V01
-    title: Replace with lesson title
-    focus: Replace with concise lesson focus
-    target_minutes: 6
-    core_selectors:
-      - heading_contains: 'Replace with source heading text'
-    reference_selectors: []
-    learning_outcomes:
-      - Replace with a source-grounded learning outcome.
-    check_question: Replace with a conceptual check.
+# Intentionally empty in the v0.6.0 production workflow.
+# Gemini reads the complete structured DOCX first and creates the actual video sequence.
+videos: []

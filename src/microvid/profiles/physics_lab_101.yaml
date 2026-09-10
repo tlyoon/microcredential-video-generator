@@ -33,7 +33,13 @@ course:
     api_key_env: GEMINI_API_KEY
     review_pass: true
     max_source_characters_per_lesson: 220000
-    prompt_set: microcredential_v2
+    prompt_set: global_design_v1+microcredential_v2
+    global_design:
+      enabled: true
+      max_source_characters: 800000
+      max_videos: 20
+      plan_review_pass: true
+      course_consistency_review: true
   content_selection:
     priority_terms: [uncertainty, measurement, mean, standard deviation, random, systematic, slope, intercept, error analysis, propagate, graph, raw data, reference value]
     priority_term_score: 2
@@ -49,6 +55,9 @@ course:
     - Prefer one worked example in depth over several examples superficially.
     - Keep detailed checklists and repetitive examples as reference-only material where possible.
 
+# The definitions below are retained for legacy/instructor-presegmented comparison only.
+# They are ignored by the v0.6.0 production default (--design-mode global).
+# Use --design-mode profile explicitly to reproduce the earlier nine-video map.
 videos:
   - id: V01
     title: What Does a Measurement Really Mean?

@@ -2,6 +2,28 @@
 
 All notable project changes are summarized here.
 
+## 0.6.0 — Global-first Gemini course design
+
+- Replaced the production default in which YAML lesson boundaries were chosen before Gemini saw the source.
+- Added a whole-document Gemini planning pass that receives the complete structured DOCX extraction before any video/slide segmentation.
+- Added a second whole-document Gemini plan-review/revision pass.
+- Added a global course plan containing course summary, pedagogical strategy, concept map, video boundaries, source-block assignments, prerequisites, already-taught concepts, forward links, checks, and takeaways.
+- Added local deterministic validation of global-plan source block IDs, duplicate core assignments, and unassigned substantive blocks.
+- Added SHA-256 source signatures so a global plan cannot be silently reused after the extracted DOCX changes.
+- Changed per-video Gemini generation so every lesson receives the global course map and full sequence context plus its assigned authoritative/reference source blocks.
+- Added final whole-course Gemini consistency review across all generated lesson manifests.
+- Added targeted per-lesson revision calls from whole-course review instructions and a final course verification pass.
+- Added a slide-production gate when unresolved blocking whole-course issues remain.
+- Added `microvid plan` for explicit whole-document planning.
+- Changed `microvid all` to extract -> globally plan -> generate/review lessons -> globally review -> build slides -> validate.
+- Added `--design-mode profile` only as an explicit legacy/instructor-presegmented compatibility mode.
+- Restricted deterministic generation to `--generator deterministic --design-mode profile` because deterministic code has no whole-document semantic reasoning.
+- Changed new-topic `scaffold-profile` behavior so it creates global-design constraints and leaves `videos: []` instead of locally guessing lesson boundaries from Heading 1 sections.
+- Added global planning, global plan review, and whole-course consistency prompt files.
+- Updated lesson generation/review prompts to honor prerequisites, already-taught concepts, forward links, and the global concept map.
+- Added `docs/GLOBAL_DESIGN.md` and comprehensively updated README, user manual, architecture, configuration reference, status, and pilot documentation.
+- Added regression tests verifying that the planning prompt contains both early and late source content and that per-lesson generation receives global context before whole-course review.
+
 ## 0.5.0 — Generic project identity and documentation consolidation
 
 - Standardized the project identity as **Microcredential Video Generator**.
@@ -10,7 +32,7 @@ All notable project changes are summarized here.
 - Updated Python package description to describe the generic DOCX-to-video workflow.
 - Updated the repository publication script to default to `microcredential-video-generator`.
 - Added `docs/CONFIGURATION_REFERENCE.md`.
-- Reworked README, user manual, architecture, project status, Chirp guide, and pilot documentation to describe the current Gemini-first, Chirp-enabled pipeline consistently.
+- Reworked README, user manual, architecture, project status, Chirp guide, and pilot documentation to describe the Gemini-first, Chirp-enabled pipeline consistently.
 - Documented repository-name independence and rename migration behavior.
 
 ## 0.4.0 — Configurable Google Cloud Chirp 3 HD TTS

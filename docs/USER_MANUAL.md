@@ -1,70 +1,122 @@
 # Microcredential Video Generator — User Manual
 
-**Package version:** 0.5.0  
-**Preferred repository name:** `microcredential-video-generator`  
+**Package version:** 0.6.0  
+**Repository:** `tlyoon/microcredential-video-generator`  
 **CLI command:** `microvid`
 
-This manual explains how to install, configure, and use the package to convert a structured teaching DOCX into short narrated microcredential videos. Physics Laboratory 101 is the bundled reference implementation; the software itself is designed to be reusable for other topics with similar document structure.
+This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, PowerPoint slide decks, narration, Google Cloud Chirp 3 HD audio, and final MP4 video.
 
-## 1. What the package does
+Physics Laboratory 101 is the bundled reference course. The engine itself is topic-neutral.
 
-The normal production pipeline is:
+---
+
+## 1. The v0.6.0 production philosophy
+
+The central design rule is:
+
+> **Gemini reads and understands the complete structured source document before the package asks it to design any individual video or slide.**
+
+The production sequence is therefore:
 
 ```text
 Source DOCX
-  -> semantic extraction with provenance
-  -> course/profile-based source selection
-  -> Google Gemini slide/narration authoring by default
-  -> grounded LLM review/revision
-  -> YAML lesson manifests
-  -> PowerPoint slide decks with speaker notes
-  -> narration, lecturer-note and SRT assets
-  -> scientific-speech normalization
-  -> Google Cloud Chirp 3 HD TTS by default
-  -> rendered slide images + per-slide audio
-  -> FFmpeg assembly
-  -> MP4 video
+  -> local semantic extraction
+  -> Gemini whole-document comprehension
+  -> Gemini global concept/course map
+  -> Gemini video segmentation + source-block assignments
+  -> local validation
+  -> Gemini global-plan review/revision
+  -> per-video Gemini slide/narration generation with global context
+  -> local QA
+  -> per-video Gemini review/revision
+  -> Gemini whole-course consistency review
+  -> targeted lesson revision if needed
+  -> final whole-course verification
+  -> local PowerPoint + notes + narration + SRT
+  -> local scientific-speech normalization
+  -> Google Cloud Chirp 3 HD TTS
+  -> local PowerPoint slide rendering
+  -> local FFmpeg MP4 assembly
 ```
 
-The package deliberately preserves intermediate files. A final MP4 is not the only output; the PowerPoint, narration, notes, subtitles, manifests, and TTS provenance remain independently inspectable and editable.
+The previous profile-first workflow is retained only for explicit compatibility/debug use.
 
-## 2. Important design rules
+---
 
-### 2.1 The runtime DOCX is explicit
+## 2. What runs locally and what uses cloud services
 
-Every production run requires `--source`. The program never silently chooses the sample DOCX stored in the repository.
+### Local PC
 
-### 2.2 The sample Physics Lab 101 DOCX is reference data only
+The following operations are performed on your computer:
 
-The tracked example is located under:
+- reading the DOCX;
+- extracting headings, paragraphs, tables, source order, and Office Math provenance;
+- creating `document_structure.json`;
+- computing the source signature;
+- validating Gemini source-block IDs;
+- storing the global plan;
+- deterministic QA of generated lesson manifests;
+- creating PowerPoint files;
+- embedding narration/production notes in PowerPoint speaker notes;
+- writing narration Markdown and SRT subtitles;
+- scientific-speech normalization;
+- exporting PowerPoint slides to PNG;
+- FFmpeg assembly of slide/audio segments and final MP4;
+- all workspace and provenance files.
 
-```text
-examples/sample_docs/
+### Google Gemini
+
+Gemini is used for the instructional reasoning:
+
+- whole-document comprehension;
+- concept mapping;
+- deciding video/lesson boundaries;
+- assigning source blocks to videos;
+- defining prerequisite and sequence relationships;
+- creating slide stacks and narration;
+- grounded lesson review/revision;
+- whole-course consistency review;
+- targeted course-level correction when required.
+
+### Google Cloud Text-to-Speech
+
+Chirp 3 HD receives the spoken narration text after local scientific-speech normalization and returns audio. It is a separate cloud service from Gemini.
+
+---
+
+## 3. What is sent to Gemini
+
+The package does **not** upload the binary DOCX directly to Gemini. The DOCX is parsed locally first.
+
+For global planning, Gemini receives the complete prompt-facing structured extraction. Each block includes information such as:
+
+```json
+{
+  "id": "b0142",
+  "kind": "paragraph",
+  "section": "8.2",
+  "heading_level": null,
+  "heading_path": [
+    "8. Propagation of uncertainty",
+    "8.2 Multiplication and division"
+  ],
+  "text": "...",
+  "math_text": ["..."],
+  "contains_office_math": true
+}
 ```
 
-It demonstrates the expected kind of structured teaching document and supports testing/reference. It is not a hidden default input.
+Raw OMML XML is retained locally. Readable math tokens are supplied to Gemini instead.
 
-### 2.3 Pagination does not control generation
+For later per-video generation, Gemini receives the global course map and sequence context plus only the authoritative source blocks assigned to that video. This avoids repeatedly sending the entire document while preserving global understanding.
 
-The parser works from Word structure, heading paths, paragraphs, tables, equations, and source order. Moving text between pages, changing margins, or inserting page breaks should not alter semantic source selection.
+See [GLOBAL_DESIGN.md](GLOBAL_DESIGN.md) for the detailed request boundary.
 
-### 2.4 LLM content generation is the normal path
+---
 
-Gemini is used to abstract selected source material into a compact pedagogical slide stack and narration rather than simply copying the DOCX into slides.
+## 4. Recommended workstation
 
-### 2.5 Final videos require explicit approval
-
-Generated lesson manifests begin in a review-required state. Final media rendering is blocked until the manifest is marked:
-
-```yaml
-editorial_status: approved
-```
-
-Use `--allow-draft` only for private previews.
-
-## 3. Recommended workstation
-
-The complete media path is designed primarily for Windows because PowerPoint automation and the SAPI fallback are Windows-specific.
+The complete media workflow is designed primarily for Windows because PowerPoint automation and the Windows SAPI fallback are Windows-specific.
 
 Recommended software:
 
@@ -75,33 +127,38 @@ Recommended software:
 - FFmpeg on `PATH`;
 - Google Cloud CLI (`gcloud`) for Application Default Credentials;
 - a Gemini API key;
-- access to a Google Cloud project with Cloud Text-to-Speech enabled.
+- a Google Cloud project with Cloud Text-to-Speech enabled.
 
-Content extraction, LLM authoring, and PowerPoint-file generation are Python operations. Final slide rendering uses PowerPoint automation on Windows.
+Content extraction and Gemini authoring can run without PowerPoint, but final PNG rendering currently uses Windows PowerPoint automation.
 
-## 4. Clone and update the repository
+---
 
-After the GitHub repository has been renamed to the preferred generic slug, a fresh clone should use:
+## 5. Clone or update the repository
+
+Fresh clone:
 
 ```powershell
 git clone https://github.com/tlyoon/microcredential-video-generator.git
 cd microcredential-video-generator
 ```
 
-If you already cloned the repository under its earlier Physics-specific name, GitHub normally redirects the old repository URL after a rename. You may nevertheless update the remote explicitly:
-
-```powershell
-git remote set-url origin https://github.com/tlyoon/microcredential-video-generator.git
-```
-
-For routine updates:
+Existing clone:
 
 ```powershell
 git switch main
 git pull --ff-only
 ```
 
-## 5. Install the local Python environment
+If an older clone still points to the previous repository name:
+
+```powershell
+git remote set-url origin https://github.com/tlyoon/microcredential-video-generator.git
+git remote -v
+```
+
+---
+
+## 6. Install the Python environment
 
 From the repository root:
 
@@ -109,7 +166,7 @@ From the repository root:
 .\scripts\setup-local.ps1
 ```
 
-Or manually:
+or manually:
 
 ```powershell
 py -3.11 -m venv .venv
@@ -118,23 +175,16 @@ python -m pip install --upgrade pip
 pip install -e ".[dev,windows]"
 ```
 
-The package installs the `microvid` CLI.
-
-Check it with:
+Verify:
 
 ```powershell
 microvid --help
-```
-
-Run regression tests:
-
-```powershell
 python -m pytest
 ```
 
-## 6. Configure Gemini
+---
 
-The bundled profile uses Gemini as the default LLM provider through the official `google-genai` SDK.
+## 7. Configure Gemini
 
 Set the API key in the current PowerShell session:
 
@@ -142,9 +192,9 @@ Set the API key in the current PowerShell session:
 $env:GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
 ```
 
-Do not store the key in Git.
+Do not commit the key to Git.
 
-The model is soft-coded in the course profile and may also be overridden at the CLI. The bundled profile currently uses:
+Typical profile settings are:
 
 ```yaml
 course:
@@ -152,22 +202,35 @@ course:
     provider: gemini
     model: gemini-flash-latest
     thinking_level: high
-    review_pass: true
+    api_key_env: GEMINI_API_KEY
+    max_source_characters_per_lesson: 220000
+    global_design:
+      max_source_characters: 800000
+      max_videos: 30
 ```
 
-For a reproducible production build, you may replace the moving alias with an exact supported model name in your local profile or pass `--model`.
+The model is configuration data. You may override it at runtime:
 
-## 7. Configure Google Cloud Chirp TTS
+```powershell
+--model "MODEL_NAME"
+--thinking-level high
+```
 
-Google Cloud Chirp 3 HD is the default production TTS provider. Configure Application Default Credentials:
+For reproducible production runs, pin an exact supported model instead of a moving alias.
+
+---
+
+## 8. Configure Chirp TTS
+
+Authenticate Google Cloud locally:
 
 ```powershell
 gcloud auth application-default login
 ```
 
-Ensure Cloud Text-to-Speech is enabled in the Google Cloud project used for synthesis.
+Ensure Cloud Text-to-Speech is enabled for the selected Google Cloud project.
 
-The default TTS configuration is conceptually:
+The packaged production defaults are conceptually:
 
 ```yaml
 tts:
@@ -182,15 +245,13 @@ tts:
   fallback_on_error: true
 ```
 
-A standalone sample configuration is provided at:
+Example configuration:
 
 ```text
 examples/tts/chirp3.example.yaml
 ```
 
-## 8. Audition voices before producing a course
-
-Generate identical sample narration with the configured candidate voices:
+Audition candidate voices before committing to a course narrator:
 
 ```powershell
 microvid tts-audition `
@@ -198,125 +259,260 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-The packaged candidates include Leda, Aoede, and Kore. Select one consistent narrator for a course unless there is a deliberate pedagogical reason to vary voices.
+---
 
-To audition an explicit voice:
+## 9. Prepare the source DOCX
 
-```powershell
-microvid tts-audition `
-  --output-dir ".\workspace\voice-audition" `
-  --voice en-US-Chirp3-HD-Aoede `
-  --language-code en-US
-```
+The runtime source is always explicit. The bundled Lab 101 DOCX is never used automatically.
 
-## 9. Prepare a runtime source DOCX
-
-Place the working document somewhere convenient, for example:
+For example:
 
 ```text
 source/my_course.docx
 ```
 
-The `source/` directory is intended for local runtime material and should not be used as a place to commit production credentials or unrelated artifacts.
+For best results, use meaningful Word heading styles and a coherent hierarchy. Paragraphs, tables, headings, and Office Math are extracted. The parser does not depend on rendered page numbers.
 
-For best results, use meaningful Word heading styles and a coherent hierarchical structure. Tables, paragraphs, and Office Math can be extracted. A document with completely inconsistent visual-only headings may require parser/profile adjustment.
+---
 
-## 10. Physics Laboratory 101: first full content build
+## 10. Create a profile for a new course
 
-Assume the corrected runtime manual is:
-
-```text
-source/Physics_Laboratory_101_Student_Manual_v2_Corrected.docx
-```
-
-Run:
+For a new topic:
 
 ```powershell
-microvid all `
-  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
-  --workspace ".\workspace\lab101" `
-  --profile physics_lab_101
+microvid scaffold-profile `
+  --source ".\source\Introduction_to_Heat_Transfer.docx" `
+  --workspace ".\workspace\heat_transfer" `
+  --output ".\profiles\heat_transfer.yaml" `
+  --course-id "heat_transfer" `
+  --title "Introduction to Heat Transfer"
 ```
 
-This performs extraction, Gemini-based lesson drafting, PowerPoint generation, and structural validation.
+### Important v0.6.0 change
 
-For a cheaper/diagnostic run without LLM authoring:
+The scaffold **does not pre-segment the DOCX into videos**. The generated `videos` list is intentionally empty.
 
-```powershell
-microvid all `
-  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
-  --workspace ".\workspace\lab101_debug" `
-  --profile physics_lab_101 `
-  --generator deterministic
-```
+Review and edit only the course constraints that matter before global planning, especially:
 
-The deterministic mode is not the preferred content-authoring workflow.
+- course title;
+- learner audience;
+- source role;
+- target video duration;
+- target total duration if known;
+- maximum slides;
+- parser conventions;
+- LLM model/reasoning settings;
+- editorial policy;
+- TTS settings.
 
-## 11. Run stages separately when reviewing or debugging
+Gemini will determine the lesson boundaries after reading the complete structured source.
 
-### 11.1 Extract
+---
+
+## 11. Recommended staged workflow
+
+The staged workflow is best for the first run of a new course because each intermediate artifact can be inspected.
+
+### 11.1 Extract the DOCX locally
 
 ```powershell
 microvid extract `
-  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
-  --workspace ".\workspace\lab101" `
-  --profile physics_lab_101
+  --source ".\source\my_course.docx" `
+  --workspace ".\workspace\my_course" `
+  --profile ".\profiles\my_course.yaml"
 ```
 
-Inspect:
+Output:
 
 ```text
-workspace/lab101/extracted/document_structure.json
+workspace/my_course/extracted/document_structure.json
 ```
 
-### 11.2 Draft manifests with Gemini
+Inspect this file if heading recognition, equations, tables, or source ordering look wrong.
+
+### 11.2 Ask Gemini to design the whole course
+
+```powershell
+microvid plan `
+  --workspace ".\workspace\my_course" `
+  --profile ".\profiles\my_course.yaml"
+```
+
+The first Gemini pass reads the complete structured source and proposes:
+
+- a course summary;
+- pedagogical strategy;
+- global concept map;
+- video count and sequence;
+- source block assignments;
+- prerequisite relationships;
+- concepts already taught by each point;
+- forward links to later lessons;
+- learning outcomes, checks, and takeaways.
+
+The local PC validates the returned source IDs and coverage. A second Gemini pass reviews/revises the complete plan against the whole source.
+
+Output:
+
+```text
+workspace/my_course/plans/course_plan.yaml
+```
+
+### 11.3 Inspect the global plan
+
+Before expensive lesson generation, inspect at least:
+
+- `course_summary`;
+- `pedagogical_strategy`;
+- `concept_map`;
+- video order and titles;
+- `core_block_ids`;
+- `reference_block_ids`;
+- `prerequisite_video_ids`;
+- `already_taught`;
+- `forward_links`;
+- coverage notes and editorial flags.
+
+This is the most important place to judge whether Gemini actually understood the source globally.
+
+### 11.4 Generate lesson manifests
 
 ```powershell
 microvid draft `
-  --workspace ".\workspace\lab101" `
-  --profile physics_lab_101
+  --workspace ".\workspace\my_course" `
+  --profile ".\profiles\my_course.yaml"
 ```
 
-The default performs generation followed by grounded LLM review/revision.
+For each planned video, Gemini receives:
 
-Use `--no-review-pass` only when deliberately making a cheaper first-pass draft.
+- the global course summary;
+- concept map;
+- full compact video sequence;
+- current lesson prerequisites and forward links;
+- assigned authoritative core blocks;
+- assigned reference blocks.
 
-### 11.3 Build PowerPoint decks
+The package performs a generation pass and a grounded lesson review/revision pass by default.
+
+### 11.5 Whole-course consistency review
+
+After all lessons are generated, the normal `draft` workflow asks Gemini to review all lessons together against the global plan.
+
+The review checks for:
+
+- missing concepts;
+- unnecessary repetition;
+- prerequisite violations;
+- inconsistent terminology or notation;
+- poor neighboring-lesson handoffs;
+- scope drift;
+- duplicated/weak checks and takeaways.
+
+Outputs:
+
+```text
+workspace/my_course/manifests/global_consistency_initial.yaml
+workspace/my_course/manifests/global_consistency_final.yaml
+```
+
+If the initial review requests targeted lesson corrections, only the affected lessons are reopened with their original source packets and global context. Gemini then performs a final course verification.
+
+If blocking issues remain, normal slide generation is blocked.
+
+### 11.6 Build PowerPoint decks
 
 ```powershell
 microvid slides `
-  --workspace ".\workspace\lab101"
+  --workspace ".\workspace\my_course"
 ```
 
-Build one lesson only:
+One lesson only:
 
 ```powershell
 microvid slides `
-  --workspace ".\workspace\lab101" `
+  --workspace ".\workspace\my_course" `
   --video V05
 ```
 
-### 11.4 Validate
+`--allow-unreviewed-course` exists only as a diagnostic override if global consistency is not ready.
+
+### 11.7 Validate
 
 ```powershell
 microvid validate `
-  --workspace ".\workspace\lab101"
+  --workspace ".\workspace\my_course"
 ```
 
-Validation checks structure; it does not replace expert review of scientific correctness, pedagogical quality, narration, or visual design.
+Validation is structural. It does not replace expert scientific/editorial review.
 
-## 12. Understand the generated workspace
+---
 
-A typical workspace contains:
+## 12. One-command workflow
+
+Once the workflow is understood:
+
+```powershell
+microvid all `
+  --source ".\source\my_course.docx" `
+  --workspace ".\workspace\my_course" `
+  --profile ".\profiles\my_course.yaml"
+```
+
+This performs:
+
+1. fresh local extraction;
+2. fresh global Gemini course planning by default;
+3. global-plan review;
+4. per-video lesson generation;
+5. per-video grounded review;
+6. whole-course consistency review/revision/verification;
+7. slide generation;
+8. structural validation.
+
+A normal `all` run replans after the fresh extraction. Use `--reuse-plan` only when deliberately reusing a plan; the package still checks that the source signature matches exactly.
+
+---
+
+## 13. Source-signature protection
+
+`course_plan.yaml` stores:
+
+```yaml
+source_signature: <sha256>
+```
+
+The signature is generated from the complete prompt-facing extraction. If the DOCX changes and is re-extracted, the signature changes.
+
+`microvid draft` reuses an existing plan only when the signature matches. A stale plan is not silently applied to a revised source.
+
+To force replanning during a staged workflow:
+
+```powershell
+microvid draft `
+  --workspace ".\workspace\my_course" `
+  --profile ".\profiles\my_course.yaml" `
+  --replan
+```
+
+---
+
+## 14. Generated workspace
+
+A typical v0.6.0 workspace contains:
 
 ```text
-workspace/course/
+workspace/my_course/
   extracted/
     document_structure.json
+  plans/
+    course_plan.yaml
   manifests/
+    course.yaml
     video_01.yaml
     video_02.yaml
     ...
+    global_consistency_initial.yaml
+    global_consistency_final.yaml
   slides/
     video_01.pptx
     ...
@@ -335,7 +531,13 @@ workspace/course/
   videos/
 ```
 
-The lesson manifest is the most important production record. Each slide may contain:
+The global plan is the course-level design contract. Each `video_NN.yaml` is the production record for one lesson.
+
+---
+
+## 15. Lesson-manifest structure
+
+A generated slide record includes fields such as:
 
 ```yaml
 id: V05S03
@@ -354,39 +556,53 @@ source_block_ids: [b0214, b0215]
 estimated_seconds: 70
 ```
 
-## 13. Review a lesson before video production
+The manifest also records:
 
-For the Lab 101 pilot, V05 is useful because it exercises equations, units, worked examples, narration, source grounding, and technical interpretation.
+- source core/reference block counts;
+- exact assigned source block IDs;
+- Gemini provider/model;
+- generation pass count;
+- design mode (`global_llm` or legacy `profile`);
+- editorial status.
+
+---
+
+## 16. Human review and approval
+
+Even after Gemini's lesson review and whole-course consistency review, final scientific/editorial acceptance remains human-controlled.
 
 Review:
 
-- source block IDs against the authoritative DOCX;
-- equations and assumptions;
-- numerical values and units;
-- visible slide density;
-- narration naturalness;
-- estimated timing;
-- visual directions;
-- assessment/check question;
-- scientific speech of symbols and units.
+- factual fidelity to the source;
+- equations, units, assumptions, and numerical values;
+- conceptual sequence;
+- slide density;
+- narration quality;
+- examples and visual directions;
+- pronunciation of scientific notation;
+- source provenance;
+- duration;
+- assessment/check questions.
 
-When satisfied, change:
+Generated lessons begin as:
 
 ```yaml
 editorial_status: llm_draft_requires_review
 ```
 
-to:
+After approval, change to:
 
 ```yaml
 editorial_status: approved
 ```
 
-## 14. Scientific speech and TTS text
+---
 
-Exact mathematics belongs in the mathematical representation, while spoken language should be natural.
+## 17. Scientific speech
 
-Example:
+Exact mathematics and spoken mathematics are intentionally separated.
+
+For example:
 
 ```yaml
 equation_latex: >
@@ -396,130 +612,130 @@ tts_text: >
   g equals four pi squared divided by the fitted slope.
 ```
 
-The package normalizes common symbols conservatively, including representations such as plus/minus, percent, pi, ohms, and common SI-unit expressions.
+Common symbols and SI expressions are normalized conservatively before TTS. If the automatic spoken form is not satisfactory, use `tts_text` or a local `tts_replacements` mapping.
 
-If the automatic form is not satisfactory, set `tts_text` explicitly for that slide. A local `tts_replacements` mapping may also correct a specific pronunciation without altering the displayed content.
+---
 
-## 15. Generate the MP4
+## 18. Generate final media
 
-After approval:
+After approving a lesson:
 
 ```powershell
 microvid media `
-  --workspace ".\workspace\lab101" `
+  --workspace ".\workspace\my_course" `
   --video V05 `
   --tts-config ".\examples\tts\chirp3.example.yaml" `
   --no-tts-fallback
 ```
 
-The final file is normally:
+Typical output:
 
 ```text
-workspace/lab101/videos/video_05.mp4
+workspace/my_course/videos/video_05.mp4
 ```
 
-The media step:
+The media stage:
 
-1. exports each PowerPoint slide as a PNG;
-2. obtains narration/`tts_text` from the manifest;
-3. normalizes scientific speech where enabled;
+1. exports each PowerPoint slide as PNG;
+2. obtains narration or explicit `tts_text`;
+3. normalizes scientific speech;
 4. synthesizes one audio file per slide;
-5. combines each PNG and audio file into an MP4 segment;
-6. concatenates the segments into the lesson video.
+5. combines slide PNG + audio into MP4 segments;
+6. concatenates segments into the final video.
 
-For final production, `--no-tts-fallback` is recommended so a Chirp failure does not silently switch the narrator to Windows SAPI.
-
-## 16. TTS audit trail
-
-The package writes:
+The TTS audit file is:
 
 ```text
-workspace/<course>/audio/video_NN/tts_manifest.yaml
+workspace/my_course/audio/video_NN/tts_manifest.yaml
 ```
 
-This records the requested TTS configuration and the actual provider, voice, locale, audio file, and spoken text used for each slide.
+It records the actual provider, voice, language, audio file, and spoken text used for every slide.
 
-Check this file when voice consistency matters.
+---
 
-## 17. Use the package with a different topic
+## 19. Physics Laboratory 101 reference workflow
 
-For a new structured teaching document, create a starter profile:
+Assume the runtime manual is:
 
-```powershell
-microvid scaffold-profile `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
-  --workspace ".\workspace\heat_transfer" `
-  --output ".\profiles\heat_transfer.yaml" `
-  --course-id "heat_transfer" `
-  --title "Introduction to Heat Transfer"
+```text
+source/Physics_Laboratory_101_Student_Manual_v2_Corrected.docx
 ```
-
-Review the generated profile carefully. Confirm:
-
-- course/audience metadata;
-- parser conventions;
-- lesson boundaries;
-- semantic source selectors;
-- learning outcomes;
-- priority terms;
-- duration and slide targets;
-- LLM settings;
-- TTS settings.
-
-Then run the same pipeline using that profile path:
-
-```powershell
-microvid all `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
-  --workspace ".\workspace\heat_transfer" `
-  --profile ".\profiles\heat_transfer.yaml"
-```
-
-A similarly structured replacement document should not require Python modification. Major semantic/structural changes may require profile edits, and required selectors that no longer match should fail visibly rather than cause silent guessing.
-
-## 18. Configuration precedence
-
-For TTS, effective settings are resolved from:
-
-1. built-in defaults;
-2. `course.tts` in the selected profile;
-3. standalone `--tts-config` YAML;
-4. explicit CLI overrides.
-
-Examples:
-
-```powershell
-microvid media `
-  --workspace ".\workspace\course" `
-  --video V01 `
-  --voice-name en-GB-Chirp3-HD-Aoede `
-  --speaking-rate 0.95
-```
-
-For LLM generation, profile values can similarly be overridden with options such as:
-
-```powershell
---model "MODEL_NAME"
---thinking-level high
-```
-
-See [CONFIGURATION_REFERENCE.md](CONFIGURATION_REFERENCE.md) for details.
-
-## 19. Media capability check
 
 Run:
 
 ```powershell
-microvid media-check
+microvid all `
+  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
+  --workspace ".\workspace\lab101" `
+  --profile physics_lab_101
 ```
 
-This reports whether the local environment can see components such as FFmpeg, Windows/PowerPoint automation support, SAPI, and the Google Cloud TTS Python package.
+In v0.6.0, the existing nine-video definitions in the Lab 101 profile no longer control the production segmentation in default global mode. They are retained for legacy/profile mode and regression comparison. Gemini is free to confirm, merge, split, or reorganize the course after reading the entire structured manual, subject to course constraints.
 
-## 20. Common problems
+For the old instructor-presegmented behavior:
+
+```powershell
+microvid draft `
+  --workspace ".\workspace\lab101" `
+  --profile physics_lab_101 `
+  --design-mode profile
+```
+
+---
+
+## 20. Deterministic/debug generation
+
+The deterministic builder has no global semantic reasoning. It therefore cannot be used with the production global design mode.
+
+Use:
+
+```powershell
+microvid all `
+  --source ".\source\course.docx" `
+  --workspace ".\workspace\debug" `
+  --profile my_profile `
+  --generator deterministic `
+  --design-mode profile
+```
+
+This path is for diagnostics/regression work, not normal instructional authoring.
+
+---
+
+## 21. Development/cost-control overrides
+
+The following options deliberately weaken the normal review architecture and should not be routine production defaults:
+
+```text
+--no-plan-review-pass
+--no-review-pass
+--no-global-consistency-review
+--design-mode profile
+```
+
+`--allow-unreviewed-course` allows slide generation when the global consistency status is not ready, but only for diagnostics.
+
+`--allow-draft` allows private media previews before human approval.
+
+---
+
+## 22. Large documents
+
+v0.6.0 sends the complete structured extraction during global planning and refuses silent truncation.
+
+Default global source limit:
+
+```yaml
+max_source_characters: 800000
+```
+
+If a source exceeds that limit, the package fails visibly. For a very large textbook, the better future architecture is hierarchical planning—major-unit/chapter comprehension followed by global synthesis—rather than blindly truncating the document.
+
+---
+
+## 23. Troubleshooting
 
 ### `microvid` is not recognized
-
-Activate the virtual environment and reinstall editable package dependencies:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
@@ -528,87 +744,66 @@ pip install -e ".[dev,windows]"
 
 ### Gemini authentication fails
 
-Verify:
-
 ```powershell
 $env:GEMINI_API_KEY
 ```
 
-and confirm that the selected model is available to the API key/account.
+Confirm the key is set and the configured model is available.
+
+### Existing plan is unexpectedly rebuilt
+
+The extracted source signature no longer matches the stored plan. This is intentional protection against using a stale plan after a DOCX change.
+
+### Global planning fails because the source is too large
+
+Do not simply assume truncation is safe. Review `global_design.max_source_characters` and consider a hierarchical planning strategy for very large sources.
+
+### Whole-course review blocks slides
+
+Inspect:
+
+```text
+manifests/global_consistency_initial.yaml
+manifests/global_consistency_final.yaml
+```
+
+Resolve remaining blocking findings. `--allow-unreviewed-course` should be used only for diagnostics.
 
 ### Chirp authentication fails
-
-Refresh Application Default Credentials:
 
 ```powershell
 gcloud auth application-default login
 ```
 
-Also confirm the Cloud Text-to-Speech API is enabled and billing/permissions permit synthesis.
+Also confirm Cloud Text-to-Speech is enabled and the project has suitable permissions/billing.
 
-### FFmpeg is unavailable
-
-Ensure:
+### FFmpeg is missing
 
 ```powershell
 ffmpeg -version
 ```
 
-works from the same terminal.
+must work from the same terminal.
 
-### Final media is blocked
+### TTS pronounces equations badly
 
-Check the manifest status. It must be `approved` unless deliberately using `--allow-draft` for a private preview.
+Use human-readable narration and an explicit `tts_text` for difficult expressions. Do not feed raw LaTeX to TTS.
 
-### TTS pronounces mathematics badly
+---
 
-Do not put raw LaTeX into the spoken channel. Add a clear `tts_text` field for the slide and optionally `tts_replacements` for local corrections.
+## 24. Recommended first production test
 
-### A revised DOCX no longer matches the profile
+For any new course:
 
-Inspect `document_structure.json` and update semantic selectors. Do not weaken the pipeline into silently accepting unrelated sections.
+1. run `extract`;
+2. run `plan`;
+3. inspect `course_plan.yaml` before generating all lessons;
+4. run `draft`;
+5. inspect the global consistency reports;
+6. inspect one representative lesson PPTX and narration;
+7. audition/confirm the Chirp voice;
+8. approve one lesson;
+9. render one MP4;
+10. only then batch-produce the rest of the course.
 
-## 21. Repository rename and local clones
-
-The preferred generic GitHub slug is:
-
-```text
-microcredential-video-generator
-```
-
-The runtime package does not depend on the repository slug. After the GitHub repository is renamed, existing clones may continue to work through GitHub redirects, but updating the remote is cleaner:
-
-```powershell
-git remote set-url origin https://github.com/tlyoon/microcredential-video-generator.git
-```
-
-Verify:
-
-```powershell
-git remote -v
-```
-
-## 22. Recommended production practice
-
-For a new course:
-
-1. preserve an authoritative source DOCX;
-2. create/review a course profile;
-3. generate one technically demanding pilot lesson;
-4. review source grounding and slide pedagogy;
-5. audition and lock a narrator voice;
-6. review scientific speech;
-7. approve and render the pilot;
-8. use the accepted conventions for the rest of the course;
-9. keep manifests, decks, TTS provenance, and final MP4s together in a course-specific workspace.
-
-This staged approach keeps the system reusable without surrendering scientific/editorial control.
-
-## 23. Related documentation
-
-- [README](../README.md)
-- [Architecture](ARCHITECTURE.md)
-- [Configuration reference](CONFIGURATION_REFERENCE.md)
-- [Chirp TTS guide](CHIRP_TTS.md)
-- [Physics Lab 101 pilot workflow](PILOT_WORKFLOW.md)
-- [Changelog](../CHANGELOG.md)
+This staged pilot catches global segmentation, scientific content, narration, voice, and media issues before they are multiplied across the course.
