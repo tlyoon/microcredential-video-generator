@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "microcredential-video-generator"
-version = "0.4.0"
-description = "DOCX-to-microcredential course pipeline for short narrated laboratory-skills videos"
+version = "0.5.0"
+description = "Generic DOCX-to-microcredential video pipeline with LLM-authored slides, narration, configurable TTS, and MP4 assembly"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
