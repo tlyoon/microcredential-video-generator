@@ -9,11 +9,18 @@ import yaml
 
 from .course_consistency import blocking_findings, review_course_consistency
 from .llm import JSONLLMProvider, LLMError
+from .narration_polisher import polish_lesson_narration
 from .qa import validate_manifest
 from .segmenter import lesson_blocks
 
 _ALLOWED_SLIDE_TYPES = [
-    "hook", "concept", "worked_example", "method", "interpretation", "check", "takeaway"
+    "hook",
+    "concept",
+    "worked_example",
+    "method",
+    "interpretation",
+    "check",
+    "takeaway",
 ]
 
 
@@ -106,7 +113,9 @@ def lesson_manifest_schema(max_slides: int) -> dict[str, Any]:
     }
 
 
-def _global_course_context(global_plan: dict | None, lesson_id: str | None) -> dict[str, Any] | None:
+def _global_course_context(
+    global_plan: dict | None, lesson_id: str | None
+) -> dict[str, Any] | None:
     if not global_plan:
         return None
     sequence = []
@@ -239,13 +248,15 @@ def _normalize_manifest(
     slides = generated.get("slides", [])
     if not isinstance(slides, list):
         raise LLMError("LLM manifest 'slides' must be a list.")
+
     normalized = []
     for i, slide in enumerate(slides, start=1):
         ids = [str(x) for x in slide.get("source_block_ids", [])]
         invalid = [x for x in ids if x not in valid_ids]
         if invalid:
             raise LLMError(
-                f"LLM returned source block IDs not supplied to the lesson: {invalid}. Generation rejected."
+                f"LLM returned source block IDs not supplied to the lesson: {invalid}. "
+                "Generation rejected."
             )
         source_blocks = [block_by_id[x] for x in ids if x in block_by_id]
         normalized.append(
@@ -268,8 +279,9 @@ def _normalize_manifest(
                 "equation_latex": slide.get("equation_latex"),
             }
         )
+
     return {
-        "schema_version": 4,
+        "schema_version": 5,
         "video_id": lesson["id"],
         "title": generated.get("lesson_title") or lesson["title"],
         "focus": lesson["focus"],
@@ -290,12 +302,16 @@ def _normalize_manifest(
             "provider": provider.provider_name,
             "model": provider.model,
             "passes": generation_passes,
-            "prompt_set": "global_design_v1+microcredential_v2"
+            "prompt_set": "global_design_v1+microcredential_v3"
             if design_mode == "global_llm"
-            else "microcredential_v2",
+            else "microcredential_v3",
         },
         "slides": normalized,
     }
+
+
+def _narration_polish_enabled(course: dict) -> bool:
+    return bool(course.get("llm", {}).get("narration_polish_pass", True))
 
 
 def build_lesson_manifest_with_llm(
@@ -313,6 +329,7 @@ def build_lesson_manifest_with_llm(
             f"{lesson.get('id', 'Lesson')} matched zero authoritative source blocks. "
             "Review the global course plan or legacy profile before invoking the LLM."
         )
+
     max_chars = int(course.get("llm", {}).get("max_source_characters_per_lesson", 220_000))
     source_chars = sum(len(str(b.get("text", ""))) for b in core + refs)
     if source_chars > max_chars:
@@ -320,12 +337,14 @@ def build_lesson_manifest_with_llm(
             f"Lesson source packet is {source_chars:,} characters, above configured limit "
             f"{max_chars:,}; it will not be truncated silently."
         )
+
     max_slides = int(lesson.get("max_slides", course.get("max_slides", 7)))
     schema = lesson_manifest_schema(max_slides)
     context = _prompt_context(course, lesson, core, refs, global_plan)
     design_mode = "global_llm" if global_plan else "profile"
+
     generated = provider.generate_json(_compose_generation_prompt(context), schema)
-    first = _normalize_manifest(
+    manifest = _normalize_manifest(
         generated,
         extraction,
         course,
@@ -336,21 +355,26 @@ def build_lesson_manifest_with_llm(
         generation_passes=1,
         design_mode=design_mode,
     )
-    if not review_pass:
-        return first
-    issues = validate_manifest(first)
-    revised = provider.generate_json(_compose_revision_prompt(context, first, issues), schema)
-    return _normalize_manifest(
-        revised,
-        extraction,
-        course,
-        lesson,
-        core,
-        refs,
-        provider,
-        generation_passes=2,
-        design_mode=design_mode,
-    )
+
+    if review_pass:
+        issues = validate_manifest(manifest)
+        revised = provider.generate_json(_compose_revision_prompt(context, manifest, issues), schema)
+        manifest = _normalize_manifest(
+            revised,
+            extraction,
+            course,
+            lesson,
+            core,
+            refs,
+            provider,
+            generation_passes=2,
+            design_mode=design_mode,
+        )
+
+    if _narration_polish_enabled(course):
+        manifest = polish_lesson_narration(manifest, context, provider)
+
+    return manifest
 
 
 def _revise_for_course_consistency(
@@ -364,12 +388,14 @@ def _revise_for_course_consistency(
 ) -> dict:
     core, refs = _lesson_source_blocks(extraction, lesson)
     context = _prompt_context(course, lesson, core, refs, global_plan)
-    schema = lesson_manifest_schema(int(lesson.get("max_slides", course.get("max_slides", 7))))
+    schema = lesson_manifest_schema(
+        int(lesson.get("max_slides", course.get("max_slides", 7)))
+    )
     revised = provider.generate_json(
         _compose_consistency_revision_prompt(context, manifest, instructions), schema
     )
     previous_passes = int(manifest.get("generation", {}).get("passes", 2))
-    return _normalize_manifest(
+    revised_manifest = _normalize_manifest(
         revised,
         extraction,
         course,
@@ -380,6 +406,9 @@ def _revise_for_course_consistency(
         generation_passes=previous_passes + 1,
         design_mode="global_llm",
     )
+    if _narration_polish_enabled(course):
+        revised_manifest = polish_lesson_narration(revised_manifest, context, provider)
+    return revised_manifest
 
 
 def _video_number(lesson: dict, n: int) -> int:
@@ -387,7 +416,9 @@ def _video_number(lesson: dict, n: int) -> int:
     return int(digits) if digits else n
 
 
-def _write_manifests(out: Path, lessons: list[dict], manifests: list[dict]) -> list[Path]:
+def _write_manifests(
+    out: Path, lessons: list[dict], manifests: list[dict]
+) -> list[Path]:
     written: list[Path] = []
     for n, (lesson, manifest) in enumerate(zip(lessons, manifests), start=1):
         path = out / f"video_{_video_number(lesson, n):02d}.yaml"
@@ -412,6 +443,7 @@ def build_all_manifests_with_llm(
     out.mkdir(parents=True, exist_ok=True)
     course = profile["course"]
     lessons = list(global_plan.get("videos", [])) if global_plan else list(profile["videos"])
+
     manifests = [
         build_lesson_manifest_with_llm(
             extraction,
@@ -467,6 +499,7 @@ def build_all_manifests_with_llm(
         "design_mode": "global_llm" if global_plan else "profile",
         "global_course_summary": global_plan.get("course_summary") if global_plan else None,
         "global_consistency_status": consistency_status,
+        "narration_polish_enabled": _narration_polish_enabled(course),
         "videos": [],
     }
     for lesson, manifest, path in zip(lessons, manifests, written):
