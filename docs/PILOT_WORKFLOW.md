@@ -1,8 +1,8 @@
-# Physics Lab 101 Reference Pilot — Global-First Workflow
+# Physics Lab 101 Reference Pilot — Global-First + Narration-Polish Workflow
 
-This is a reference-course workflow, not a statement that the software is Physics-specific. In v0.6.0, the most important first checkpoint is no longer a preselected V05 boundary. The first checkpoint is whether Gemini's **whole-document global plan** correctly understands and segments the Lab 101 manual.
+This is a reference-course workflow, not a statement that the software is Physics-specific. The first checkpoint is whether Gemini's **whole-document global plan** correctly understands and segments the Lab 101 manual. The second major checkpoint is whether the dedicated narration editor produces natural, technically faithful spoken teaching before TTS.
 
-V05/propagation of uncertainty remains a useful representative media pilot *if the global plan still assigns that topic to a comparable lesson*. Gemini is allowed to reorganize the final sequence after reading the full source.
+Propagation of uncertainty remains a useful representative media pilot if the global plan assigns that topic to a comparable lesson. Gemini is allowed to reorganize the sequence after reading the full source.
 
 ## 1. Prepare the workstation
 
@@ -51,13 +51,7 @@ microvid extract `
   --profile physics_lab_101
 ```
 
-Inspect:
-
-```text
-workspace/lab101/extracted/document_structure.json
-```
-
-Confirm headings, tables, equations, and source order are represented correctly.
+Inspect `workspace/lab101/extracted/document_structure.json` and confirm headings, tables, equations, and source order are represented correctly.
 
 ## 4. Run whole-document Gemini planning
 
@@ -67,26 +61,9 @@ microvid plan `
   --profile physics_lab_101
 ```
 
-Inspect:
+Inspect `workspace/lab101/plans/course_plan.yaml` and verify the course summary, concept map, prerequisites, source assignments, worked-example placement, video boundaries, `already_taught`, `forward_links`, and planned total duration.
 
-```text
-workspace/lab101/plans/course_plan.yaml
-```
-
-Before generating slide decks, verify that Gemini has understood the complete manual:
-
-- Does the course summary accurately characterize the source?
-- Is the concept map sensible?
-- Are prerequisites ordered correctly?
-- Are worked examples attached to the most useful lessons?
-- Are important source blocks omitted or duplicated unnecessarily?
-- Are video boundaries pedagogically better than simply mirroring section headings?
-- Are `already_taught` and `forward_links` coherent?
-- Is the planned total duration reasonable?
-
-This is now the most important architectural review point.
-
-## 5. Generate globally informed lessons
+## 5. Generate, review and polish the lessons
 
 ```powershell
 microvid draft `
@@ -96,12 +73,15 @@ microvid draft `
 
 Each lesson receives the global concept/sequence context plus its assigned source blocks. The default performs:
 
-1. lesson generation;
-2. deterministic local QA;
-3. grounded lesson review/revision;
-4. whole-course consistency review;
-5. targeted lesson revisions where requested;
-6. final whole-course verification.
+1. lesson/slide generation with first-pass narration;
+2. deterministic local lesson QA;
+3. grounded Gemini scientific/pedagogical review/revision;
+4. **dedicated Gemini narration-only polish**;
+5. local narration speech/timing QA;
+6. whole-course consistency review;
+7. targeted lesson revisions where requested;
+8. re-polishing of any revised lesson narration;
+9. final whole-course verification.
 
 Inspect:
 
@@ -112,13 +92,44 @@ workspace/lab101/manifests/global_consistency_final.yaml
 
 The final status should be `ready` before normal slide generation.
 
-## 6. Choose a representative lesson for the media pilot
+## 6. Choose a representative lesson for narration/media review
 
-Look in `course_plan.yaml` and identify the planned lesson containing propagation of uncertainty or another technically demanding topic involving equations, units, worked examples, and interpretation.
+Look in `course_plan.yaml` and identify a technically demanding lesson involving equations, units, worked reasoning, and interpretation. Propagation of uncertainty is a strong candidate.
 
-If this remains V05, use V05 below. If Gemini assigns it another ID, substitute that ID.
+If the lesson is V05, use V05 below. If Gemini assigns another ID, substitute it.
 
-## 7. Build the representative PowerPoint
+## 7. Inspect the polished narration before building media
+
+Open, for example:
+
+```text
+workspace/lab101/manifests/video_05.yaml
+```
+
+For every slide, inspect:
+
+```yaml
+narration: ...
+tts_text: ...
+narration_word_count: ...
+narration_estimated_spoken_seconds: ...
+estimated_seconds: ...
+```
+
+Check that the script:
+
+- sounds like one continuous lecturer explanation rather than isolated captions;
+- explains rather than reads visible bullets;
+- uses terminology consistent with the source/global plan;
+- synchronizes naturally with `visual_direction`;
+- verbalizes equations and units naturally;
+- avoids generic filler and repeated stock transitions;
+- fits comfortably within the allocated slide time;
+- preserves all scientific qualifications and assumptions.
+
+The narration polish stage is source-grounded but remains subject to human review. See `docs/NARRATION_QUALITY.md` for the full contract.
+
+## 8. Build the representative PowerPoint
 
 ```powershell
 microvid slides `
@@ -126,32 +137,13 @@ microvid slides `
   --video V05
 ```
 
-Review visible slides and speaker notes. Speaker notes contain narration and production guidance.
+Review visible slides and speaker notes together. Speaker notes contain the final polished narration and production guidance.
 
-## 8. Review the lesson manifest
+## 9. Review the complete lesson
 
-Inspect, for example:
+Check source block IDs/fidelity, equations, units, numerical values, assumptions, global-course fit, slide density, polished narration, `tts_text`, timing, lecturer notes, visual directions, assessment, and editorial flags.
 
-```text
-workspace/lab101/manifests/video_05.yaml
-```
-
-Check:
-
-- source block IDs and fidelity;
-- equations, units, numerical values, and assumptions;
-- consistency with the global course plan;
-- whether narration assumes only concepts already taught;
-- whether the lesson prepares the planned forward links;
-- slide density and conceptual sequence;
-- narration naturalness;
-- `tts_text` for difficult mathematical expressions;
-- estimated timings;
-- lecturer notes and visual directions;
-- assessment/check question;
-- editorial flags.
-
-## 9. Approve the representative lesson
+## 10. Approve the representative lesson
 
 Only after scientific/editorial review, set:
 
@@ -159,7 +151,7 @@ Only after scientific/editorial review, set:
 editorial_status: approved
 ```
 
-## 10. Render the pilot MP4 with Chirp
+## 11. Render the pilot MP4 with Chirp
 
 ```powershell
 microvid media `
@@ -183,15 +175,19 @@ workspace/lab101/audio/video_05/tts_manifest.yaml
 
 Confirm the intended provider and voice were actually used.
 
-## 11. Lock production conventions
+## 12. Listen, do not only read
+
+The final narration quality test should be auditory. Listen to the entire representative video and check cadence, pauses, sentence rhythm, mathematical pronunciation, timing against visual builds, and whether transitions feel natural. If needed, edit `narration`/`tts_text` manually before approving the remaining course.
+
+## 13. Lock production conventions
 
 After the representative video is accepted, record decisions for narrator voice, speaking rate, slide density, equation presentation, narration tone, worked-example pacing, visual/build conventions, pause timing, and scientific-speech overrides.
 
 Then review/approve and batch-produce the remaining globally planned lessons.
 
-## 12. Legacy comparison only
+## 14. Legacy comparison only
 
-The old nine-video Lab 101 profile remains available for comparison with the new global segmentation:
+The old nine-video Lab 101 profile remains available for comparison:
 
 ```powershell
 microvid draft `
@@ -200,4 +196,4 @@ microvid draft `
   --design-mode profile
 ```
 
-This is not the v0.6.0 production default. It can be useful to compare Gemini's global segmentation with the earlier instructor-defined structure.
+This is not the production default; it is useful only when comparing Gemini's global segmentation with the earlier instructor-defined structure.

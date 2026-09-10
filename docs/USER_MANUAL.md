@@ -1,22 +1,24 @@
 # Microcredential Video Generator — User Manual
 
-**Package version:** 0.6.0  
+**Package version:** 0.7.0  
 **Repository:** `tlyoon/microcredential-video-generator`  
 **CLI command:** `microvid`
 
-This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, PowerPoint slide decks, narration, Google Cloud Chirp 3 HD audio, and final MP4 video.
+This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, separately polished narration, PowerPoint slide decks, Google Cloud Chirp 3 HD audio, and final MP4 video.
 
 Physics Laboratory 101 is the bundled reference course. The engine itself is topic-neutral.
 
 ---
 
-## 1. The v0.6.0 production philosophy
+## 1. Production philosophy
 
-The central design rule is:
+Two design rules now govern the production path:
 
 > **Gemini reads and understands the complete structured source document before the package asks it to design any individual video or slide.**
 
-The production sequence is therefore:
+> **The spoken narration is given its own dedicated editorial pass after the scientific content and slide structure have been reviewed.**
+
+The normal sequence is:
 
 ```text
 Source DOCX
@@ -26,20 +28,23 @@ Source DOCX
   -> Gemini video segmentation + source-block assignments
   -> local validation
   -> Gemini global-plan review/revision
-  -> per-video Gemini slide/narration generation with global context
-  -> local QA
-  -> per-video Gemini review/revision
+  -> per-video Gemini slide + first-narration generation with global context
+  -> local lesson QA
+  -> per-video Gemini scientific/pedagogical review/revision
+  -> dedicated Gemini narration-only polish
+  -> local narration timing/speech QA
   -> Gemini whole-course consistency review
   -> targeted lesson revision if needed
+       -> narration is polished again for revised lessons
   -> final whole-course verification
-  -> local PowerPoint + notes + narration + SRT
+  -> local PowerPoint + notes + polished narration + SRT
   -> local scientific-speech normalization
   -> Google Cloud Chirp 3 HD TTS
   -> local PowerPoint slide rendering
   -> local FFmpeg MP4 assembly
 ```
 
-The previous profile-first workflow is retained only for explicit compatibility/debug use.
+The previous profile-first workflow remains only for explicit compatibility/debug use.
 
 ---
 
@@ -56,8 +61,10 @@ The following operations are performed on your computer:
 - validating Gemini source-block IDs;
 - storing the global plan;
 - deterministic QA of generated lesson manifests;
+- checking polished narration for obvious raw LaTeX/markup or internal production language;
+- calculating narration word count and estimated spoken duration;
 - creating PowerPoint files;
-- embedding narration/production notes in PowerPoint speaker notes;
+- embedding polished narration/production notes in PowerPoint speaker notes;
 - writing narration Markdown and SRT subtitles;
 - scientific-speech normalization;
 - exporting PowerPoint slides to PNG;
@@ -66,15 +73,16 @@ The following operations are performed on your computer:
 
 ### Google Gemini
 
-Gemini is used for the instructional reasoning:
+Gemini is used for instructional and editorial reasoning:
 
 - whole-document comprehension;
 - concept mapping;
 - deciding video/lesson boundaries;
 - assigning source blocks to videos;
 - defining prerequisite and sequence relationships;
-- creating slide stacks and narration;
-- grounded lesson review/revision;
+- creating slide stacks and first-pass narration;
+- grounded scientific/pedagogical lesson review/revision;
+- dedicated narration-only polishing;
 - whole-course consistency review;
 - targeted course-level correction when required.
 
@@ -108,9 +116,21 @@ For global planning, Gemini receives the complete prompt-facing structured extra
 
 Raw OMML XML is retained locally. Readable math tokens are supplied to Gemini instead.
 
-For later per-video generation, Gemini receives the global course map and sequence context plus only the authoritative source blocks assigned to that video. This avoids repeatedly sending the entire document while preserving global understanding.
+For per-video generation, Gemini receives the global course map and sequence context plus only the authoritative/reference source blocks assigned to that video.
 
-See [GLOBAL_DESIGN.md](GLOBAL_DESIGN.md) for the detailed request boundary.
+For the dedicated narration-polish pass, Gemini receives the **fixed reviewed lesson manifest** plus the same source/global context. The narration editor can return only:
+
+```yaml
+slides:
+  - slide_id: V05S01
+    narration: >
+      polished spoken script
+    tts_text: null
+```
+
+It is not allowed to return replacement slide titles, bullets, equations, visual directions, source IDs, or lesson structure. Local code requires every existing slide ID exactly once.
+
+See [GLOBAL_DESIGN.md](GLOBAL_DESIGN.md) and [NARRATION_QUALITY.md](NARRATION_QUALITY.md).
 
 ---
 
@@ -203,11 +223,15 @@ course:
     model: gemini-flash-latest
     thinking_level: high
     api_key_env: GEMINI_API_KEY
+    review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
     global_design:
       max_source_characters: 800000
       max_videos: 30
 ```
+
+`narration_polish_pass` defaults to `true` even when an older profile omits it. Set it to `false` only for deliberate cost/diagnostic comparison.
 
 The model is configuration data. You may override it at runtime:
 
@@ -288,22 +312,9 @@ microvid scaffold-profile `
   --title "Introduction to Heat Transfer"
 ```
 
-### Important v0.6.0 change
-
 The scaffold **does not pre-segment the DOCX into videos**. The generated `videos` list is intentionally empty.
 
-Review and edit only the course constraints that matter before global planning, especially:
-
-- course title;
-- learner audience;
-- source role;
-- target video duration;
-- target total duration if known;
-- maximum slides;
-- parser conventions;
-- LLM model/reasoning settings;
-- editorial policy;
-- TTS settings.
+Review and edit the course constraints that matter before global planning, especially course title, audience, target video/total duration, maximum slides, parser conventions, LLM model, narration rate, `narration_polish_pass`, editorial policy, and TTS settings.
 
 Gemini will determine the lesson boundaries after reading the complete structured source.
 
@@ -328,8 +339,6 @@ Output:
 workspace/my_course/extracted/document_structure.json
 ```
 
-Inspect this file if heading recognition, equations, tables, or source ordering look wrong.
-
 ### 11.2 Ask Gemini to design the whole course
 
 ```powershell
@@ -338,19 +347,7 @@ microvid plan `
   --profile ".\profiles\my_course.yaml"
 ```
 
-The first Gemini pass reads the complete structured source and proposes:
-
-- a course summary;
-- pedagogical strategy;
-- global concept map;
-- video count and sequence;
-- source block assignments;
-- prerequisite relationships;
-- concepts already taught by each point;
-- forward links to later lessons;
-- learning outcomes, checks, and takeaways.
-
-The local PC validates the returned source IDs and coverage. A second Gemini pass reviews/revises the complete plan against the whole source.
+Gemini reads the complete structured source and proposes a course summary, pedagogical strategy, concept map, video sequence, source assignments, prerequisite relationships, checks, and takeaways. The local PC validates source IDs and coverage; a second Gemini pass reviews/revises the plan.
 
 Output:
 
@@ -360,22 +357,9 @@ workspace/my_course/plans/course_plan.yaml
 
 ### 11.3 Inspect the global plan
 
-Before expensive lesson generation, inspect at least:
+Before expensive lesson generation, inspect at least the course summary, pedagogical strategy, concept map, video order/titles, core/reference block IDs, prerequisite relationships, forward links, coverage notes, and editorial flags.
 
-- `course_summary`;
-- `pedagogical_strategy`;
-- `concept_map`;
-- video order and titles;
-- `core_block_ids`;
-- `reference_block_ids`;
-- `prerequisite_video_ids`;
-- `already_taught`;
-- `forward_links`;
-- coverage notes and editorial flags.
-
-This is the most important place to judge whether Gemini actually understood the source globally.
-
-### 11.4 Generate lesson manifests
+### 11.4 Generate and polish lesson manifests
 
 ```powershell
 microvid draft `
@@ -383,30 +367,38 @@ microvid draft `
   --profile ".\profiles\my_course.yaml"
 ```
 
-For each planned video, Gemini receives:
+For each planned video, the normal path now performs:
 
-- the global course summary;
-- concept map;
-- full compact video sequence;
-- current lesson prerequisites and forward links;
-- assigned authoritative core blocks;
-- assigned reference blocks.
+1. Gemini slide + first-narration generation;
+2. local deterministic lesson QA;
+3. Gemini grounded scientific/pedagogical review/revision;
+4. **Gemini dedicated narration-only polish**;
+5. local narration speech/timing checks.
 
-The package performs a generation pass and a grounded lesson review/revision pass by default.
+The narration editor is intentionally constrained to spoken fields only. Its detailed prompt asks for a natural lecturer voice, smooth slide-to-slide continuity, visual synchronization, explanation rather than bullet recitation, restrained conversational tone, TTS-ready mathematical speech, deliberate punctuation, and realistic pacing.
+
+For most explanatory slides, it targets roughly 70–85% of theoretical speaking capacity:
+
+```text
+estimated_seconds * narration_wpm / 60
+```
+
+The final slide record may include:
+
+```yaml
+narration: >
+  polished spoken script
+
+tts_text: >
+  optional TTS-specific wording
+
+narration_word_count: 82
+narration_estimated_spoken_seconds: 37.8
+```
 
 ### 11.5 Whole-course consistency review
 
-After all lessons are generated, the normal `draft` workflow asks Gemini to review all lessons together against the global plan.
-
-The review checks for:
-
-- missing concepts;
-- unnecessary repetition;
-- prerequisite violations;
-- inconsistent terminology or notation;
-- poor neighboring-lesson handoffs;
-- scope drift;
-- duplicated/weak checks and takeaways.
+After all lessons have been generated and narration-polished, Gemini reviews them together against the global plan. It checks missing concepts, unnecessary repetition, prerequisite violations, terminology/notation consistency, neighboring-lesson handoffs, scope drift, and weak/duplicated assessments.
 
 Outputs:
 
@@ -415,7 +407,7 @@ workspace/my_course/manifests/global_consistency_initial.yaml
 workspace/my_course/manifests/global_consistency_final.yaml
 ```
 
-If the initial review requests targeted lesson corrections, only the affected lessons are reopened with their original source packets and global context. Gemini then performs a final course verification.
+If the review requests a targeted correction, only the affected lesson is reopened. **Any revised lesson is sent through narration polishing again** before final course verification.
 
 If blocking issues remain, normal slide generation is blocked.
 
@@ -433,8 +425,6 @@ microvid slides `
   --workspace ".\workspace\my_course" `
   --video V05
 ```
-
-`--allow-unreviewed-course` exists only as a diagnostic override if global consistency is not ready.
 
 ### 11.7 Validate
 
@@ -458,16 +448,7 @@ microvid all `
   --profile ".\profiles\my_course.yaml"
 ```
 
-This performs:
-
-1. fresh local extraction;
-2. fresh global Gemini course planning by default;
-3. global-plan review;
-4. per-video lesson generation;
-5. per-video grounded review;
-6. whole-course consistency review/revision/verification;
-7. slide generation;
-8. structural validation.
+This performs fresh local extraction, global Gemini course planning/review, per-video lesson generation/review, dedicated narration polishing, whole-course consistency review/revision/verification, slide generation, and structural validation.
 
 A normal `all` run replans after the fresh extraction. Use `--reuse-plan` only when deliberately reusing a plan; the package still checks that the source signature matches exactly.
 
@@ -481,24 +462,13 @@ A normal `all` run replans after the fresh extraction. Use `--reuse-plan` only w
 source_signature: <sha256>
 ```
 
-The signature is generated from the complete prompt-facing extraction. If the DOCX changes and is re-extracted, the signature changes.
-
-`microvid draft` reuses an existing plan only when the signature matches. A stale plan is not silently applied to a revised source.
-
-To force replanning during a staged workflow:
-
-```powershell
-microvid draft `
-  --workspace ".\workspace\my_course" `
-  --profile ".\profiles\my_course.yaml" `
-  --replan
-```
+The signature is generated from the complete prompt-facing extraction. If the DOCX changes and is re-extracted, the signature changes. A stale plan is not silently applied to a revised source.
 
 ---
 
 ## 14. Generated workspace
 
-A typical v0.6.0 workspace contains:
+A typical workspace contains:
 
 ```text
 workspace/my_course/
@@ -517,14 +487,8 @@ workspace/my_course/
     video_01.pptx
     ...
   notes/
-    video_01_notes.md
-    ...
   narration/
-    video_01.md
-    ...
   subtitles/
-    video_01.srt
-    ...
   rendered_slides/
   audio/
   segments/
@@ -537,7 +501,7 @@ The global plan is the course-level design contract. Each `video_NN.yaml` is the
 
 ## 15. Lesson-manifest structure
 
-A generated slide record includes fields such as:
+A polished generated slide record includes fields such as:
 
 ```yaml
 id: V05S03
@@ -546,7 +510,8 @@ title: Which measurement dominates?
 onscreen:
   - concise visible teaching content
 narration: >
-  Natural spoken explanation for this exact slide.
+  Polished natural spoken explanation for this exact slide.
+tts_text: null
 lecturer_notes:
   - teaching emphasis
 visual_direction: >
@@ -554,35 +519,21 @@ visual_direction: >
 equation_latex: null
 source_block_ids: [b0214, b0215]
 estimated_seconds: 70
+narration_word_count: 96
+narration_estimated_spoken_seconds: 44.3
 ```
 
-The manifest also records:
-
-- source core/reference block counts;
-- exact assigned source block IDs;
-- Gemini provider/model;
-- generation pass count;
-- design mode (`global_llm` or legacy `profile`);
-- editorial status.
+The manifest also records source assignments, Gemini provider/model, generation pass count, narration-polish provenance, design mode, narration-quality findings, and editorial status.
 
 ---
 
 ## 16. Human review and approval
 
-Even after Gemini's lesson review and whole-course consistency review, final scientific/editorial acceptance remains human-controlled.
+Even after Gemini's scientific/pedagogical review, dedicated narration polish, and whole-course consistency review, final acceptance remains human-controlled.
 
-Review:
+Review factual fidelity, equations/units/assumptions, conceptual sequence, slide density, narration naturalness, visual synchronization, pacing, pronunciation, source provenance, duration, and assessment quality.
 
-- factual fidelity to the source;
-- equations, units, assumptions, and numerical values;
-- conceptual sequence;
-- slide density;
-- narration quality;
-- examples and visual directions;
-- pronunciation of scientific notation;
-- source provenance;
-- duration;
-- assessment/check questions.
+For narration, the best check is to **listen to at least one representative lesson using the intended Chirp voice**, not merely read the text.
 
 Generated lessons begin as:
 
@@ -602,8 +553,6 @@ editorial_status: approved
 
 Exact mathematics and spoken mathematics are intentionally separated.
 
-For example:
-
 ```yaml
 equation_latex: >
   g = \frac{4\pi^2}{m}
@@ -612,7 +561,7 @@ tts_text: >
   g equals four pi squared divided by the fitted slope.
 ```
 
-Common symbols and SI expressions are normalized conservatively before TTS. If the automatic spoken form is not satisfactory, use `tts_text` or a local `tts_replacements` mapping.
+The narration editor may propose `tts_text` when useful, and the local TTS layer also normalizes common symbols and SI expressions conservatively. If the spoken form is still unsatisfactory, edit `tts_text` or use `tts_replacements`.
 
 ---
 
@@ -634,22 +583,13 @@ Typical output:
 workspace/my_course/videos/video_05.mp4
 ```
 
-The media stage:
-
-1. exports each PowerPoint slide as PNG;
-2. obtains narration or explicit `tts_text`;
-3. normalizes scientific speech;
-4. synthesizes one audio file per slide;
-5. combines slide PNG + audio into MP4 segments;
-6. concatenates segments into the final video.
+The media stage exports PowerPoint slides to PNG, uses polished narration or explicit `tts_text`, normalizes scientific speech, synthesizes one audio file per slide, combines PNG + audio into MP4 segments, then concatenates the segments.
 
 The TTS audit file is:
 
 ```text
 workspace/my_course/audio/video_NN/tts_manifest.yaml
 ```
-
-It records the actual provider, voice, language, audio file, and spoken text used for every slide.
 
 ---
 
@@ -670,24 +610,13 @@ microvid all `
   --profile physics_lab_101
 ```
 
-In v0.6.0, the existing nine-video definitions in the Lab 101 profile no longer control the production segmentation in default global mode. They are retained for legacy/profile mode and regression comparison. Gemini is free to confirm, merge, split, or reorganize the course after reading the entire structured manual, subject to course constraints.
-
-For the old instructor-presegmented behavior:
-
-```powershell
-microvid draft `
-  --workspace ".\workspace\lab101" `
-  --profile physics_lab_101 `
-  --design-mode profile
-```
+The existing nine-video definitions in the Lab 101 profile do not control the production segmentation in default global mode. They remain for legacy/profile comparison. Narration polishing is enabled explicitly in the Lab 101 profile.
 
 ---
 
 ## 20. Deterministic/debug generation
 
-The deterministic builder has no global semantic reasoning. It therefore cannot be used with the production global design mode.
-
-Use:
+The deterministic builder has no global semantic reasoning and no Gemini narration editor. Use it only with profile mode:
 
 ```powershell
 microvid all `
@@ -702,9 +631,9 @@ This path is for diagnostics/regression work, not normal instructional authoring
 
 ---
 
-## 21. Development/cost-control overrides
+## 21. Development/cost controls
 
-The following options deliberately weaken the normal review architecture and should not be routine production defaults:
+The following options weaken parts of the normal review architecture and should not be routine production defaults:
 
 ```text
 --no-plan-review-pass
@@ -713,23 +642,27 @@ The following options deliberately weaken the normal review architecture and sho
 --design-mode profile
 ```
 
-`--allow-unreviewed-course` allows slide generation when the global consistency status is not ready, but only for diagnostics.
+Narration polish is controlled in YAML:
 
-`--allow-draft` allows private media previews before human approval.
+```yaml
+course:
+  llm:
+    narration_polish_pass: true
+```
+
+Set it to `false` only for deliberate A/B cost/quality testing.
 
 ---
 
 ## 22. Large documents
 
-v0.6.0 sends the complete structured extraction during global planning and refuses silent truncation.
-
-Default global source limit:
+The global planner sends the complete structured extraction during global planning and refuses silent truncation. The default global source limit is:
 
 ```yaml
 max_source_characters: 800000
 ```
 
-If a source exceeds that limit, the package fails visibly. For a very large textbook, the better future architecture is hierarchical planning—major-unit/chapter comprehension followed by global synthesis—rather than blindly truncating the document.
+For a source larger than that limit, use a deliberate hierarchical planning strategy rather than arbitrary truncation.
 
 ---
 
@@ -750,24 +683,21 @@ $env:GEMINI_API_KEY
 
 Confirm the key is set and the configured model is available.
 
+### Narration polish fails with a speech-hygiene error
+
+Inspect the Gemini output or source for raw LaTeX/code-like text or internal production language in the spoken channel. The narration editor is expected to verbalize mathematics naturally. Exact equations belong in `equation_latex`; TTS-specific wording belongs in `tts_text`.
+
+### Narration has timing warnings
+
+Compare `narration_word_count`, `narration_estimated_spoken_seconds`, and `estimated_seconds`. A warning means the script may sound rushed at the configured narration rate. Shorten repetition or increase the slide timing only when pedagogically justified.
+
 ### Existing plan is unexpectedly rebuilt
 
-The extracted source signature no longer matches the stored plan. This is intentional protection against using a stale plan after a DOCX change.
-
-### Global planning fails because the source is too large
-
-Do not simply assume truncation is safe. Review `global_design.max_source_characters` and consider a hierarchical planning strategy for very large sources.
+The extracted source signature no longer matches the stored plan. This is intentional protection against stale global plans.
 
 ### Whole-course review blocks slides
 
-Inspect:
-
-```text
-manifests/global_consistency_initial.yaml
-manifests/global_consistency_final.yaml
-```
-
-Resolve remaining blocking findings. `--allow-unreviewed-course` should be used only for diagnostics.
+Inspect `global_consistency_initial.yaml` and `global_consistency_final.yaml`. Resolve remaining blocking findings. `--allow-unreviewed-course` should be used only for diagnostics.
 
 ### Chirp authentication fails
 
@@ -787,7 +717,7 @@ must work from the same terminal.
 
 ### TTS pronounces equations badly
 
-Use human-readable narration and an explicit `tts_text` for difficult expressions. Do not feed raw LaTeX to TTS.
+Use natural narration and explicit `tts_text` for difficult expressions. Do not feed raw LaTeX to TTS.
 
 ---
 
@@ -796,14 +726,15 @@ Use human-readable narration and an explicit `tts_text` for difficult expression
 For any new course:
 
 1. run `extract`;
-2. run `plan`;
-3. inspect `course_plan.yaml` before generating all lessons;
-4. run `draft`;
-5. inspect the global consistency reports;
-6. inspect one representative lesson PPTX and narration;
+2. run `plan` and inspect `course_plan.yaml`;
+3. run `draft`;
+4. inspect the global consistency reports;
+5. inspect one representative lesson manifest, paying special attention to the polished narration and timing metrics;
+6. build its PPTX and check narration against the visual sequence;
 7. audition/confirm the Chirp voice;
-8. approve one lesson;
-9. render one MP4;
-10. only then batch-produce the rest of the course.
+8. listen to the representative narrated lesson;
+9. approve one lesson;
+10. render one MP4;
+11. only then batch-produce the rest of the course.
 
-This staged pilot catches global segmentation, scientific content, narration, voice, and media issues before they are multiplied across the course.
+This staged pilot catches global segmentation, scientific content, narration style, voice, and media issues before they are multiplied across the course.

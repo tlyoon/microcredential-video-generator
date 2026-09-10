@@ -32,8 +32,9 @@ course:
     thinking_level: high
     api_key_env: GEMINI_API_KEY
     review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
-    prompt_set: global_design_v1+microcredential_v2
+    prompt_set: global_design_v1+microcredential_v3+narration_polish_v1
     global_design:
       enabled: true
       max_source_characters: 800000
@@ -56,7 +57,7 @@ course:
     - Keep detailed checklists and repetitive examples as reference-only material where possible.
 
 # The definitions below are retained for legacy/instructor-presegmented comparison only.
-# They are ignored by the v0.6.0 production default (--design-mode global).
+# They are ignored by the production default (--design-mode global).
 # Use --design-mode profile explicitly to reproduce the earlier nine-video map.
 videos:
   - id: V01

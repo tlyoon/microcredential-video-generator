@@ -15,6 +15,31 @@ class GlobalFakeProvider:
 
     def generate_json(self, prompt, schema):
         self.prompts.append(prompt)
+        if "DEDICATED NARRATION POLISH PASS" in prompt:
+            return {
+                "slides": [
+                    {
+                        "slide_id": "V01S01",
+                        "narration": "Start with two different questions. One asks how much energy can be stored, while the other asks how effectively supplied input becomes useful output. Keeping those questions separate will organize the whole lesson.",
+                        "tts_text": None,
+                    },
+                    {
+                        "slide_id": "V01S02",
+                        "narration": "Capacity answers the storage question. It describes how much can be stored under the stated conditions, so those conditions are part of what gives the capacity its meaning.",
+                        "tts_text": None,
+                    },
+                    {
+                        "slide_id": "V01S03",
+                        "narration": "Efficiency asks something different. Instead of how much can be stored, it compares the useful output with the supplied input. That distinction prevents us from treating capacity and efficiency as interchangeable ideas.",
+                        "tts_text": None,
+                    },
+                    {
+                        "slide_id": "V01S04",
+                        "narration": "Pause here and decide which concept answers this question: useful output compared with supplied input. Focus on the type of comparison being made.",
+                        "tts_text": None,
+                    },
+                ]
+            }
         if "WHOLE-COURSE CONSISTENCY REVIEW" in prompt:
             return {
                 "status": "ready",
@@ -132,7 +157,10 @@ def _profile():
             "narration_wpm": 130,
             "target_video_minutes": 3,
             "max_slides": 6,
-            "llm": {"global_design": {"max_source_characters": 100000, "max_videos": 10}},
+            "llm": {
+                "narration_polish_pass": True,
+                "global_design": {"max_source_characters": 100000, "max_videos": 10},
+            },
         },
         "videos": [],
     }
@@ -154,7 +182,7 @@ def test_global_planner_reads_the_complete_document_before_segmentation(tmp_path
     assert plan["videos"][0]["core_block_ids"] == ["b0001", "b0002", "b0003", "b0004"]
 
 
-def test_per_lesson_generation_receives_global_map_and_final_course_review(tmp_path):
+def test_per_lesson_generation_receives_global_map_polish_and_final_course_review(tmp_path):
     source = tmp_path / "source.docx"
     _make_source(source)
     extraction = extract_docx(source)
@@ -177,8 +205,14 @@ def test_per_lesson_generation_receives_global_map_and_final_course_review(tmp_p
     assert lesson_prompts
     assert "global_course_context" in lesson_prompts[0]
     assert "Energy storage and efficiency form one short conceptual sequence" in lesson_prompts[0]
+    assert any("DEDICATED NARRATION POLISH PASS" in p for p in provider.prompts)
     assert any("WHOLE-COURSE CONSISTENCY REVIEW" in p for p in provider.prompts)
+
+    manifest = yaml.safe_load(paths[0].read_text())
+    assert manifest["generation"]["narration_polish"]["enabled"] is True
+    assert manifest["slides"][0]["narration"].startswith("Start with two different questions")
 
     index = yaml.safe_load((tmp_path / "manifests" / "course.yaml").read_text())
     assert index["design_mode"] == "global_llm"
     assert index["global_consistency_status"] == "ready"
+    assert index["narration_polish_enabled"] is True

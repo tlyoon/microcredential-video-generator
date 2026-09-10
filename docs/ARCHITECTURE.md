@@ -6,7 +6,7 @@
 
 The Python package name is `microcredential-video-generator` and the CLI command is `microvid`.
 
-## Production graph — v0.6.0 global-first default
+## Production graph — v0.7.0 global-first default
 
 ```text
 explicit runtime DOCX
@@ -24,11 +24,14 @@ explicit runtime DOCX
   -> global course plan YAML
   -> for each planned video:
        global course context + assigned source blocks
-       -> GEMINI slide/narration generation
-       -> LOCAL deterministic QA
-       -> GEMINI grounded lesson review/revision
+       -> GEMINI slide + first-narration generation
+       -> LOCAL deterministic lesson QA
+       -> GEMINI grounded scientific/pedagogical lesson review/revision
+       -> GEMINI dedicated narration-only polish
+       -> LOCAL narration speech/timing QA
   -> GEMINI whole-course consistency review
        -> targeted lesson revisions where requested
+       -> re-polish narration for any revised lesson
        -> final consistency verification
   -> LOCAL structured lesson manifests
   -> LOCAL PPTX + speaker notes + narration + lecturer notes + SRT
@@ -46,8 +49,8 @@ explicit runtime DOCX
 2. **Extraction JSON** — ordered semantic blocks with provenance and semantic heading paths.
 3. **Course constraint profile YAML** — audience, parser rules, LLM/TTS configuration, timing limits, and editorial policy. In global mode it does not dictate lesson boundaries.
 4. **Global course plan YAML** — Gemini's reviewed whole-document concept map, lesson segmentation, source block assignments, prerequisites, and sequence. This becomes the design contract for lesson generation.
-5. **Prompt set** — version-controlled global-planning, lesson-generation, lesson-review, and course-consistency policies.
-6. **Lesson manifest YAML** — production source of truth for one video; every slide owns visible content, narration, notes, visual direction, timing, and source provenance.
+5. **Prompt set** — version-controlled global-planning, lesson-generation, lesson-review, narration-polish, and course-consistency policies.
+6. **Lesson manifest YAML** — production source of truth for one video; every slide owns visible content, polished narration, notes, visual direction, timing, source provenance, and optional TTS-specific wording.
 7. **TTS configuration** — voice/provider settings independent of lesson content.
 8. **Generated assets** — PPTX, notes, narration, subtitles, rendered slides, audio, segment files, and final MP4.
 
@@ -55,7 +58,7 @@ The tracked DOCX under `examples/sample_docs/` is sample data only and is never 
 
 ## Global LLM boundary
 
-The key v0.6.0 change is that lesson boundaries are no longer chosen locally before Gemini understands the source.
+Lesson boundaries are not chosen locally before Gemini understands the source.
 
 During global planning, the local parser sends Gemini the complete prompt-facing extraction: block ID, block kind, optional section, heading level/path, text, readable math tokens, and a flag indicating Office Math. Raw OMML XML stays local.
 
@@ -85,36 +88,62 @@ After global planning, each lesson-generation call receives:
 
 The entire DOCX is therefore not resent for every lesson, but the lesson is never generated without awareness of its role in the whole course.
 
-Each lesson receives a generation pass followed by a grounded review/revision pass by default. Every source-derived slide must cite block IDs supplied in that lesson packet. Invented provenance is rejected.
+Each lesson receives a generation pass followed by a grounded scientific/pedagogical review/revision pass by default. Every source-derived slide must cite block IDs supplied in that lesson packet. Invented provenance is rejected.
+
+## Dedicated narration editorial layer
+
+Narration is deliberately separated from the general lesson-review task because spoken-script quality has different optimization goals from scientific correctness and slide architecture.
+
+After lesson content and structure are settled, Gemini receives:
+
+- the fixed lesson manifest;
+- current narration;
+- title and on-screen text for every slide;
+- `visual_direction`;
+- equations;
+- slide timing;
+- narration words-per-minute target;
+- global course context;
+- the same authoritative/reference source blocks.
+
+The narration-polish schema only permits:
+
+```text
+slide_id
+narration
+tts_text (optional)
+```
+
+It cannot return new titles, bullets, equations, source IDs, visual directions, or lesson structure. Local code verifies that every existing slide ID is returned exactly once.
+
+The dedicated prompt treats the lesson as continuous speech rather than independent slide captions. It asks for natural university-lecturer delivery, smooth transitions, visual synchronization, explanation rather than bullet recitation, controlled sentence rhythm, TTS-ready mathematical speech, and restraint from generic filler or AI-like phrasing.
+
+Local speech-hygiene QA rejects obvious raw LaTeX/markup and internal production/meta language in the final narration. It records per-slide word count and estimated spoken duration and warns when the script is too dense for the allocated slide time.
+
+If whole-course consistency review later requires a targeted revision of a lesson, that revised lesson is sent through narration polishing again before final course verification.
+
+See `docs/NARRATION_QUALITY.md` for the detailed narration contract.
 
 ## Whole-course consistency layer
 
-Once every lesson has been generated, Gemini reviews the complete course plan and compact versions of all generated lesson manifests together.
+Once every lesson has been generated and polished, Gemini reviews the complete course plan and compact versions of all generated lesson manifests together.
 
-The review checks for:
+The review checks for concept gaps, accidental repetition, prerequisite violations, inconsistent terminology/notation/units/definitions, premature introduction of later material, poor hand-offs between videos, duplicated or weak checks/takeaways, and drift from the globally planned scope.
 
-- concept gaps;
-- accidental repetition;
-- prerequisite violations;
-- inconsistent terminology, notation, units, or definitions;
-- premature introduction of later-course material;
-- poor hand-offs between videos;
-- duplicated/weak checks and takeaways;
-- drift from the globally planned scope.
+The review can return targeted revision instructions for specific videos. Those lessons are regenerated using their original authoritative source packets plus global context and the consistency instructions, and their narration is polished again. Gemini then performs a final whole-course verification.
 
-The review can return targeted revision instructions for specific videos. Those lessons are regenerated using their original authoritative source packets plus global context and the consistency instructions. Gemini then performs a final whole-course verification.
-
-If blocking issues remain, normal slide production is blocked. The draft lesson manifests and review reports remain available for diagnosis.
+If blocking issues remain, normal slide production is blocked. Draft lesson manifests and review reports remain available for diagnosis.
 
 ## Prompt architecture
 
-The version-controlled prompt set now separates five responsibilities:
+The version-controlled prompt set separates distinct responsibilities:
 
 - `system_microcredential_architect.md` — invariant source-fidelity, pedagogy, narration, and production rules;
 - `global_course_planning.md` — whole-document comprehension, concept mapping, and video segmentation;
 - `global_course_plan_review.md` — independent review/revision of the global plan against the full source;
-- `lesson_generation.md` — slide/narration design using both global context and local authoritative blocks;
-- `lesson_review.md` — grounded per-lesson review/revision;
+- `lesson_generation.md` — slide/first-narration design using both global context and local authoritative blocks;
+- `lesson_review.md` — grounded scientific/pedagogical per-lesson review/revision;
+- `narration_polish.md` — dedicated spoken-script editing with frozen lesson structure;
 - `global_course_consistency_review.md` — final cross-lesson coherence and targeted revision instructions.
 
 The LLM provider interface remains separate from extraction, PowerPoint, TTS, and media rendering.
@@ -127,7 +156,7 @@ Document structure is represented using heading level, semantic breadcrumb path,
 
 ## Generic-course boundary
 
-For a new topic, `microvid scaffold-profile` now creates a **constraint profile**, not a locally guessed set of lesson boundaries. The scaffold provides course/audience placeholders, parser conventions, Gemini settings, global-design limits, and generic TTS configuration. Its `videos` list is intentionally empty.
+For a new topic, `microvid scaffold-profile` creates a **constraint profile**, not a locally guessed set of lesson boundaries. The scaffold provides course/audience placeholders, parser conventions, Gemini settings, global-design limits, narration-polish policy, and generic TTS configuration. Its `videos` list is intentionally empty.
 
 Gemini then reads the whole extracted source and decides the course segmentation.
 
@@ -140,13 +169,14 @@ Deterministic generation has no whole-document semantic reasoning and therefore 
 Each generated slide binds together:
 
 - concise on-screen content;
-- full natural narration;
+- polished natural narration;
 - lecturer notes;
 - visual/build direction;
 - optional exact LaTeX;
 - source block IDs;
 - estimated timing;
-- optional `tts_text` and `tts_replacements`.
+- optional `tts_text` and `tts_replacements`;
+- narration word-count and estimated spoken-duration metrics after polishing.
 
 The PPTX embeds narration and production guidance in speaker notes while standalone text assets are also written.
 
@@ -160,7 +190,7 @@ The final Windows media path is:
 
 ```text
 PPTX -> PowerPoint PNG export
-manifest narration -> normalized text -> TTS audio
+polished manifest narration/tts_text -> normalized text -> TTS audio
 PNG + audio -> FFmpeg segment
 segments -> final MP4
 ```
@@ -169,4 +199,4 @@ Human scientific/editorial approval remains a separate gate. Final media renderi
 
 ## Large-document boundary
 
-v0.6.0 intentionally sends the complete structured source in the global planning pass and refuses silent truncation. The default global limit is 800,000 prompt-facing source characters. Very large books should eventually use a hierarchical planner rather than relying on arbitrary truncation or blind context-limit increases.
+The global planning pass intentionally sends the complete structured source and refuses silent truncation. The default global limit is 800,000 prompt-facing source characters. Very large books should eventually use a hierarchical planner rather than relying on arbitrary truncation or blind context-limit increases.
