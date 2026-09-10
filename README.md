@@ -1,141 +1,89 @@
 # Microcredential Video Generator
 
-A reusable Python pipeline for converting a structured `.docx` teaching document into short microcredential-style narrated videos.
+A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using LLM-authored slide abstraction, PowerPoint generation, configurable text-to-speech, and FFmpeg assembly.
+
+**Recommended GitHub repository name:** `microcredential-video-generator`  
+**Current package version:** `0.5.0`  
+**CLI command:** `microvid`
+
+Physics Laboratory 101 is the bundled reference implementation and sample course profile. The engine itself is topic-neutral.
 
 ## Start here
 
-For installation, first-run setup, Gemini configuration, Chirp voice setup, Lab 101 production, use with a different DOCX/topic, review/approval, MP4 rendering, and troubleshooting, see the **[complete user manual](docs/USER_MANUAL.md)**.
+- [Complete user manual](docs/USER_MANUAL.md)
+- [Architecture and genericity contract](docs/ARCHITECTURE.md)
+- [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
+- [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
+- [Physics Lab 101 pilot workflow](docs/PILOT_WORKFLOW.md)
+- [Changelog](CHANGELOG.md)
 
 ## Production architecture
 
 ```text
-Explicit source DOCX
-   -> semantic extraction + lesson source packets
-   -> capable LLM content abstraction (Google Gemini by default)
-   -> slide-stack manifest
-      - slide title and concise on-screen content
-      - full narration script for that slide
+Explicit runtime DOCX
+   -> semantic extraction + source provenance
+   -> profile-driven lesson source packets
+   -> Google Gemini lesson abstraction by default
+   -> grounded LLM review/revision
+   -> structured slide manifests
+      - concise on-screen content
+      - full narration per slide
       - lecturer notes
       - visual/build directions
-      - equations and source provenance
-   -> PowerPoint deck with narration embedded in speaker notes
+      - equations and source block IDs
+   -> PowerPoint decks with speaker notes
+   -> narration / notes / subtitle assets
    -> scientific-speech normalization
-   -> TTS per slide (Google Cloud Chirp 3 HD by default)
-   -> slide/audio segments
-   -> MP4 video
+   -> Google Cloud Chirp 3 HD TTS by default
+   -> rendered slide + audio segments
+   -> FFmpeg
+   -> MP4
 ```
 
-The bundled course profile is **Physics Laboratory 101**, designed for nine approximately 5–8 minute videos. The full manual remains the technical reference; the videos teach the reasoning students need to act correctly in the laboratory.
+## Source document policy
 
-## LLM content generation is the default
+The runtime source is always explicit:
 
-Normal `microvid draft` and `microvid all` runs use an LLM. The packaged default provider is Google Gemini and the default model selector is:
+```powershell
+microvid all `
+  --source ".\source\my_course.docx" `
+  --workspace ".\workspace\my_course" `
+  --profile my_course
+```
+
+The tracked Lab 101 document under `examples/sample_docs/` is sample/reference data only. It is never selected automatically and is never a hidden fallback.
+
+The parser is pagination-independent. It works from Word structure, heading paths, block type, source order, tables, paragraphs, and Office Math provenance rather than rendered page numbers.
+
+## LLM authoring
+
+LLM generation is the normal content-authoring path. The bundled provider is Google Gemini through the official `google-genai` SDK. Provider/model settings are profile data rather than hard-coded into the engine.
 
 ```yaml
-provider: gemini
-model: gemini-flash-latest
-thinking_level: high
+course:
+  llm:
+    provider: gemini
+    model: gemini-flash-latest
+    thinking_level: high
+    api_key_env: GEMINI_API_KEY
+    review_pass: true
 ```
 
-For controlled production runs you may pin an exact Gemini model in the YAML profile or with `--model`. The Gemini integration uses the official `google-genai` SDK and structured JSON output. Set the API key locally before generation:
+Set the API key locally:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
 ```
 
-Then:
-
-```powershell
-microvid all `
-  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
-  --workspace ".\workspace\lab101"
-```
-
-By default, each lesson receives two LLM passes: lesson architecture/content generation followed by an independent grounded review and complete revision. Use `--no-review-pass` only when a cheaper/faster first-pass draft is deliberately desired.
-
-A deterministic source-extractive builder is retained only for offline/debug work:
+A deterministic builder remains available only for offline/debugging work:
 
 ```powershell
 microvid all ... --generator deterministic
 ```
 
-It is not selected silently when Gemini credentials are missing.
+## Slide/narration production record
 
-## Carefully separated prompt set
-
-The LLM workflow is governed by version-controlled prompts under `src/microvid/prompts/`. The system prompt enforces evidence discipline, micro-learning pedagogy, slide abstraction, narration, visuals, technical integrity and assessment. Narration is explicitly written as TTS-ready spoken prose: exact mathematics belongs in `equation_latex`, while spoken narration explains symbols and units naturally rather than reading notation character-by-character.
-
-The prompt packet supplies only the source blocks assigned to the lesson plus course/lesson design metadata. Every source-derived slide must return valid `source_block_ids`; invented provenance causes generation to fail rather than being accepted silently.
-
-## Sample source vs runtime source
-
-The repository intentionally contains a sample copy of the corrected Lab 101 manual at:
-
-```text
-examples/sample_docs/Physics_Laboratory_101_Student_Manual_v2_Corrected.docx
-```
-
-That file is reference/sample data only. The package never locates it automatically and never uses it as a fallback. Every build requires an explicit runtime source:
-
-```powershell
-microvid all --source "C:\path\to\your\actual.docx" --workspace ".\workspace\course"
-```
-
-Production source documents may be placed under the local `source/` directory, which remains ignored by Git.
-
-## Soft-coded document handling
-
-The engine does not depend on Word page numbers. Page count and pagination can change freely. Document structure is represented by heading level, optional numeric section identifier, semantic heading breadcrumb (`heading_path`), block type, source order and provenance. Profiles can select source material semantically, for example:
-
-```yaml
-core_selectors:
-  - heading_contains: "Propagation of uncertainty"
-```
-
-rather than by a fixed section number. Thus ordinary renumbering does not break the profile. Materially renamed/reorganized content is reported as profile drift rather than guessed silently.
-
-Physics-specific ranking terms and model/provider settings live in YAML profile data rather than in the generic Python engine.
-
-## Completely different DOCX/topic
-
-For a new topic with a similar Word structure, first scaffold a profile:
-
-```powershell
-microvid scaffold-profile `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
-  --workspace ".\workspace\heat_transfer" `
-  --output ".\profiles\heat_transfer.yaml" `
-  --course-id "heat_transfer" `
-  --title "Introduction to Heat Transfer"
-```
-
-Review/edit the generated YAML, then build with that profile. No Python modification should be required.
-
-## Installation
-
-Windows PowerShell:
-
-```powershell
-.\scripts\setup-local.ps1
-```
-
-Or manually:
-
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --upgrade pip
-.\.venv\Scripts\python.exe -m pip install -e ".[dev,windows]"
-```
-
-Run tests:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest
-```
-
-## Generated lesson representation
-
-Each slide in the YAML manifest contains a tightly coupled production record such as:
+Each slide is represented as one production unit in YAML:
 
 ```yaml
 id: V05S03
@@ -144,22 +92,21 @@ title: Which measurement dominates?
 onscreen:
   - concise visible teaching content
 narration: >
-  Full natural spoken script for this exact slide.
+  Natural spoken explanation for this exact slide.
 lecturer_notes:
   - teaching emphasis
-  - likely misconception
 visual_direction: >
-  Show the contributions sequentially and highlight the largest one.
+  Show the two contributions sequentially.
 equation_latex: null
 source_block_ids: [b0214, b0215]
 estimated_seconds: 70
 ```
 
-The PowerPoint generator writes narration, lecturer notes, visual direction and source provenance into each slide's speaker notes, while standalone narration/notes/SRT files are generated for media automation and editing.
+The same narration and production guidance are also written into PowerPoint speaker notes. Standalone narration, lecturer-note, and `.srt` subtitle assets are generated alongside the deck.
 
-## Google Cloud Chirp 3 HD TTS
+## TTS
 
-TTS is a separate downstream layer from Gemini lesson authoring. The production default is Google Cloud Chirp 3 HD using a female British-English voice:
+The production default is Google Cloud Chirp 3 HD with a configurable female British-English voice:
 
 ```yaml
 tts:
@@ -174,17 +121,9 @@ tts:
   fallback_on_error: true
 ```
 
-The default values live in the TTS configuration layer, not in the video renderer. They can be overridden using a standalone YAML file such as `examples/tts/chirp3.example.yaml`, by placing `tts` settings under `course` in a course profile, or with CLI options.
+Windows SAPI is retained as a fallback. Scientific notation is normalized conservatively before synthesis, and slides may provide `tts_text` or local `tts_replacements` when a specific spoken form is required.
 
-Google Cloud TTS uses Application Default Credentials on the local workstation. A common setup is:
-
-```powershell
-gcloud auth application-default login
-```
-
-No credentials belong in Git.
-
-To audition the packaged female voice candidates using the same scientific narration:
+Voice audition:
 
 ```powershell
 microvid tts-audition `
@@ -192,39 +131,53 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-The example compares `Leda`, `Aoede`, and `Kore`. You can add or substitute any supported Chirp 3 HD voice without modifying Python.
+## Installation
 
-Scientific speech is normalized conservatively before synthesis. Examples include `±` -> “plus or minus”, `m s⁻²` -> “metres per second squared”, `%` -> “percent”, and `Ω` -> “ohms”. For an expression needing a specific spoken rendering, a slide can define `tts_text`; for local pronunciation corrections it can define a small `tts_replacements` mapping.
-
-See `docs/CHIRP_TTS.md` for setup and examples.
-
-## Video rendering
-
-Final local media assembly uses PowerPoint for 16:9 slide rendering, the configured TTS provider for one audio file per slide, and FFmpeg for MP4 assembly:
+On Windows PowerShell:
 
 ```powershell
-microvid media `
-  --workspace ".\workspace\lab101" `
-  --video V05 `
-  --tts-config ".\examples\tts\chirp3.example.yaml"
+.\scripts\setup-local.ps1
 ```
 
-Windows SAPI remains available as a fallback or can be selected explicitly with `--tts-provider sapi`. The generated `audio/video_NN/tts_manifest.yaml` records the actual provider, voice and normalized spoken text used for every slide.
+or manually:
 
-Final media rendering is blocked until the lesson manifest is explicitly approved. LLM output begins as:
-
-```yaml
-editorial_status: llm_draft_requires_review
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[dev,windows]"
 ```
 
-After scientific and editorial review, change it to:
+Run the regression tests:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest
+```
+
+## Generic use with another topic
+
+For a different structured DOCX, scaffold a profile first:
+
+```powershell
+microvid scaffold-profile `
+  --source ".\source\Introduction_to_Heat_Transfer.docx" `
+  --workspace ".\workspace\heat_transfer" `
+  --output ".\profiles\heat_transfer.yaml" `
+  --course-id "heat_transfer" `
+  --title "Introduction to Heat Transfer"
+```
+
+Review the generated YAML, then run the same extraction, LLM, PowerPoint, TTS, and MP4 pipeline. Python source changes should not be required for a similarly structured teaching document.
+
+## Editorial gate
+
+Generated manifests are not treated as publication-ready automatically. LLM output begins with a review-required status. Final media generation is blocked until the manifest is explicitly marked:
 
 ```yaml
 editorial_status: approved
 ```
 
-This prevents automatically generated teaching material from being mistaken for a reviewed final lesson.
+This keeps automatic generation separate from scientific/editorial acceptance.
 
-## Version
+## Repository naming
 
-Current package version: **0.4.0**.
+The software is generic, so the preferred repository slug is `microcredential-video-generator`. Internal documentation uses relative links and the Python package/CLI do not depend on the GitHub repository slug, so renaming the GitHub repository does not change runtime behavior.
