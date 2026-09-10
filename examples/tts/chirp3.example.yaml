@@ -1,0 +1,14 @@
+tts:
+  provider: google_cloud_chirp3
+  language_code: en-GB
+  voice_name: en-GB-Chirp3-HD-Leda
+  audio_encoding: LINEAR16
+  speaking_rate: 1.0
+  location: global
+  normalize_scientific_speech: true
+  fallback_provider: sapi
+  fallback_on_error: true
+  audition_voices:
+    - en-GB-Chirp3-HD-Leda
+    - en-GB-Chirp3-HD-Aoede
+    - en-GB-Chirp3-HD-Kore

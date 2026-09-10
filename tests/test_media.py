@@ -6,3 +6,4 @@ def test_media_capabilities_shape():
     assert "ffmpeg" in caps
     assert "powerpoint_automation_possible" in caps
     assert "sapi_tts_possible" in caps
+    assert "google_cloud_tts_package" in caps

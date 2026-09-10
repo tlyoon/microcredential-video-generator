@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "microcredential-video-generator"
-version = "0.3.0"
+version = "0.4.0"
 description = "DOCX-to-microcredential course pipeline for short narrated laboratory-skills videos"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -13,6 +13,7 @@ dependencies = [
   "python-pptx>=1.0",
   "PyYAML>=6.0",
   "google-genai",
+  "google-cloud-texttospeech>=2.27",
 ]
 
 [project.optional-dependencies]
