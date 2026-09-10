@@ -1,0 +1,52 @@
+course_id: physics_lab_101
+title: Physics Laboratory 101 — Microcredential Slide Stack and Narration Scripts
+version: lab101_microcredential_v0.1
+generated_at: '2026-09-10'
+generation_note: Draft generated in ChatGPT for repository staging; not a live Gemini API generation. Requires instructor review before approval/media production.
+tts_target: Google Cloud Chirp 3 HD, en-GB-Chirp3-HD-Leda or local override
+videos:
+  - id: V01
+    title: What Does a Measurement Really Mean?
+    focus: Measurement, units, resolution and why uncertainty belongs with a result.
+    target_minutes: 5.0
+    slide_count: 6
+  - id: V02
+    title: Can You Trust Your Measurement?
+    focus: Accuracy, precision, random variation and systematic effects.
+    target_minutes: 5.5
+    slide_count: 6
+  - id: V03
+    title: From Raw Data to a Reliable Result
+    focus: Data integrity, repeated measurements, mean, scatter and uncertainty of the mean.
+    target_minutes: 6.0
+    slide_count: 6
+  - id: V04
+    title: Understanding Uncertainty
+    focus: Absolute, relative and percentage uncertainty; error versus uncertainty; sensible rounding.
+    target_minutes: 5.5
+    slide_count: 6
+  - id: V05
+    title: Propagation of Uncertainty
+    focus: How uncertainty moves through sums, differences, products, quotients and powers.
+    target_minutes: 7.0
+    slide_count: 7
+  - id: V06
+    title: Finding What Limits Your Experiment
+    focus: Uncertainty budgets and a complete density-style calculation.
+    target_minutes: 6.0
+    slide_count: 6
+  - id: V07
+    title: Treating and Graphing Experimental Data
+    focus: Legitimate data transformation, background subtraction, error bars and physically justified linearisation.
+    target_minutes: 6.5
+    slide_count: 6
+  - id: V08
+    title: Getting Physics from a Graph
+    focus: Fitted slope, intercept, residuals and the pendulum-style linear relationship.
+    target_minutes: 6.5
+    slide_count: 6
+  - id: V09
+    title: Discussing and Reporting an Experiment Properly
+    focus: Comparing with reference values, quantitative error analysis and scientific conclusions.
+    target_minutes: 6.5
+    slide_count: 6
