@@ -2,88 +2,142 @@
 
 ## Project identity
 
-**Microcredential Video Generator** is a topic-neutral Python framework. The preferred repository slug is `microcredential-video-generator`. Physics Laboratory 101 is the bundled reference profile and sample dataset; it is not a hard-coded domain restriction.
+**Microcredential Video Generator** is a topic-neutral Python framework. Physics Laboratory 101 is the bundled reference profile and sample dataset; it is not a hard-coded domain restriction.
 
-The Python package name is `microcredential-video-generator` and the CLI command is `microvid`. Neither depends on the GitHub repository slug.
+The Python package name is `microcredential-video-generator` and the CLI command is `microvid`.
 
-## Production graph
+## Production graph — v0.6.0 global-first default
 
 ```text
 explicit runtime DOCX
-  -> semantic extraction + provenance
-  -> profile-driven lesson source packet
-  -> Gemini lesson architecture + slide/narration generation by default
-  -> grounded LLM review/revision
-  -> structured slide manifest
-  -> PPTX + speaker notes + narration + lecturer notes + SRT
-  -> scientific-speech normalization
+  -> LOCAL semantic extraction + provenance
+  -> COMPLETE structured extraction
+  -> GEMINI global course planning
+       -> course summary
+       -> concept map
+       -> pedagogical strategy
+       -> video boundaries
+       -> source block assignments
+       -> prerequisites / already-taught / forward links
+  -> LOCAL plan validation + source-signature protection
+  -> GEMINI global-plan review/revision
+  -> global course plan YAML
+  -> for each planned video:
+       global course context + assigned source blocks
+       -> GEMINI slide/narration generation
+       -> LOCAL deterministic QA
+       -> GEMINI grounded lesson review/revision
+  -> GEMINI whole-course consistency review
+       -> targeted lesson revisions where requested
+       -> final consistency verification
+  -> LOCAL structured lesson manifests
+  -> LOCAL PPTX + speaker notes + narration + lecturer notes + SRT
+  -> LOCAL scientific-speech normalization
   -> configurable TTS provider
        -> Google Cloud Chirp 3 HD by default
        -> Windows SAPI fallback
-  -> one audio file per slide
-  -> PowerPoint slide rendering
-  -> slide/audio video segments
-  -> FFmpeg concatenation
-  -> MP4
+  -> LOCAL PowerPoint slide rendering
+  -> LOCAL FFmpeg segment/MP4 assembly
 ```
 
 ## Source-of-truth layers
 
 1. **Explicit runtime DOCX** — authoritative subject source selected with `--source`.
 2. **Extraction JSON** — ordered semantic blocks with provenance and semantic heading paths.
-3. **Course profile YAML** — pedagogical boundaries, LLM settings, duration targets, source selectors, ranking terms, and optional TTS defaults.
-4. **Prompt set** — version-controlled content-generation and review policy.
-5. **Lesson manifest YAML** — production source of truth for one video; every slide owns its visible content, narration, notes, visual direction, timing, and source provenance.
-6. **TTS configuration** — voice/provider settings independent of lesson content.
-7. **Generated assets** — PPTX, notes, narration, subtitles, rendered slides, audio, segment files, and final MP4.
+3. **Course constraint profile YAML** — audience, parser rules, LLM/TTS configuration, timing limits, and editorial policy. In global mode it does not dictate lesson boundaries.
+4. **Global course plan YAML** — Gemini's reviewed whole-document concept map, lesson segmentation, source block assignments, prerequisites, and sequence. This becomes the design contract for lesson generation.
+5. **Prompt set** — version-controlled global-planning, lesson-generation, lesson-review, and course-consistency policies.
+6. **Lesson manifest YAML** — production source of truth for one video; every slide owns visible content, narration, notes, visual direction, timing, and source provenance.
+7. **TTS configuration** — voice/provider settings independent of lesson content.
+8. **Generated assets** — PPTX, notes, narration, subtitles, rendered slides, audio, segment files, and final MP4.
 
 The tracked DOCX under `examples/sample_docs/` is sample data only and is never automatically selected.
 
-## LLM boundary
+## Global LLM boundary
 
-Content abstraction is an LLM task by default, not a deterministic text-copying task. The deterministic builder remains available for offline/debugging use.
+The key v0.6.0 change is that lesson boundaries are no longer chosen locally before Gemini understands the source.
 
-The LLM provider interface is separate from source selection, PowerPoint generation, TTS, and rendering. The shipped provider is Gemini. Model name, thinking level, API-key environment variable, review behavior, and source-packet limits are profile data. This permits model upgrades without changing segmentation or media code.
+During global planning, the local parser sends Gemini the complete prompt-facing extraction: block ID, block kind, optional section, heading level/path, text, readable math tokens, and a flag indicating Office Math. Raw OMML XML stays local.
 
-The bundled profile currently uses the configurable `gemini-flash-latest` selector. Production teams may pin an exact model when reproducibility is more important than automatic movement to a later model.
+Gemini receives the complete document once for planning and again for plan review. The planner may group non-contiguous source blocks into one lesson where that better reflects the conceptual structure.
 
-## Grounding and provenance
+The global-plan schema requires explicit `core_block_ids` and optional `reference_block_ids` for every video. Unknown source IDs are rejected locally.
 
-Each lesson receives only its selected source blocks with IDs, kinds, heading paths, text, tables, and readable math tokens. Full Office Math provenance is retained by extraction but is not unnecessarily dumped into every prompt.
+## Global plan source signature
 
-LLM output is structured. Every source-derived slide must identify supporting block IDs. Unknown/invented source IDs are rejected. A zero-match required selector fails visibly before content generation rather than silently substituting unrelated content.
+A SHA-256 signature is calculated from the complete prompt-facing extraction and stored in `plans/course_plan.yaml`. This prevents a plan from one DOCX revision being silently reused after the source changes.
+
+`microvid draft` may reuse a plan only when its signature matches the current extraction. `microvid all` replans by default after a fresh extraction; `--reuse-plan` only reuses a source-matched plan.
+
+## Per-lesson LLM boundary
+
+After global planning, each lesson-generation call receives:
+
+- the global course summary;
+- pedagogical strategy;
+- concept map;
+- the compact full lesson sequence;
+- current lesson prerequisites;
+- concepts marked `already_taught`;
+- `forward_links` to later lessons;
+- authoritative core blocks assigned by the global plan;
+- optional reference blocks assigned by the global plan.
+
+The entire DOCX is therefore not resent for every lesson, but the lesson is never generated without awareness of its role in the whole course.
+
+Each lesson receives a generation pass followed by a grounded review/revision pass by default. Every source-derived slide must cite block IDs supplied in that lesson packet. Invented provenance is rejected.
+
+## Whole-course consistency layer
+
+Once every lesson has been generated, Gemini reviews the complete course plan and compact versions of all generated lesson manifests together.
+
+The review checks for:
+
+- concept gaps;
+- accidental repetition;
+- prerequisite violations;
+- inconsistent terminology, notation, units, or definitions;
+- premature introduction of later-course material;
+- poor hand-offs between videos;
+- duplicated/weak checks and takeaways;
+- drift from the globally planned scope.
+
+The review can return targeted revision instructions for specific videos. Those lessons are regenerated using their original authoritative source packets plus global context and the consistency instructions. Gemini then performs a final whole-course verification.
+
+If blocking issues remain, normal slide production is blocked. The draft lesson manifests and review reports remain available for diagnosis.
 
 ## Prompt architecture
 
-The prompt system separates stable responsibilities instead of relying on an ad-hoc one-line request. It covers:
+The version-controlled prompt set now separates five responsibilities:
 
-- evidence discipline and source fidelity;
-- micro-learning pedagogy and cognitive load;
-- conceptual compression and lesson flow;
-- slide architecture and visual direction;
-- natural spoken narration;
-- TTS-ready expression of units/symbols;
-- scientific/technical integrity;
-- assessment design;
-- grounded second-pass review/revision.
+- `system_microcredential_architect.md` — invariant source-fidelity, pedagogy, narration, and production rules;
+- `global_course_planning.md` — whole-document comprehension, concept mapping, and video segmentation;
+- `global_course_plan_review.md` — independent review/revision of the global plan against the full source;
+- `lesson_generation.md` — slide/narration design using both global context and local authoritative blocks;
+- `lesson_review.md` — grounded per-lesson review/revision;
+- `global_course_consistency_review.md` — final cross-lesson coherence and targeted revision instructions.
 
-Prompt files are version-controlled under `src/microvid/prompts/` and can evolve independently of the renderer.
+The LLM provider interface remains separate from extraction, PowerPoint, TTS, and media rendering.
 
-## Pagination independence and document revision handling
+## Pagination independence
 
-The parser does not use rendered Word pages. Changes to margins, page breaks, font size, or pagination do not alter semantic source selection.
+The parser does not use rendered Word pages. Changes to margins, page breaks, font size, or pagination do not alter the semantic extraction.
 
-Document structure is based on heading level, semantic breadcrumb path, source order, block type, and optional section identifiers. Semantic selectors such as `heading_contains` are preferred over page ranges or rigid numbering. Ordinary renumbering should therefore remain compatible; materially renamed or removed topics are reported as profile drift.
+Document structure is represented using heading level, semantic breadcrumb path, source order, block type, optional section identifiers, tables, paragraphs, and Office Math provenance.
 
 ## Generic-course boundary
 
-A different topic does not require Python changes when its DOCX has a reasonably comparable structure. `microvid scaffold-profile` creates an editable starter YAML profile from a new source. Human/editorial review remains responsible for confirming lesson boundaries, source selectors, outcomes, terminology, and priorities before production.
+For a new topic, `microvid scaffold-profile` now creates a **constraint profile**, not a locally guessed set of lesson boundaries. The scaffold provides course/audience placeholders, parser conventions, Gemini settings, global-design limits, and generic TTS configuration. Its `videos` list is intentionally empty.
 
-Domain-specific ranking terms belong in the course profile, never in generic Python code.
+Gemini then reads the whole extracted source and decides the course segmentation.
+
+The legacy pre-segmented profile workflow remains available only with `--design-mode profile`. It exists for compatibility, testing, or deliberate instructor-controlled segmentation, not as the normal production path.
+
+Deterministic generation has no whole-document semantic reasoning and therefore requires `--generator deterministic --design-mode profile`.
 
 ## Slide as the atomic production unit
 
-Each slide binds together:
+Each generated slide binds together:
 
 - concise on-screen content;
 - full natural narration;
@@ -94,26 +148,15 @@ Each slide binds together:
 - estimated timing;
 - optional `tts_text` and `tts_replacements`.
 
-The PPTX embeds narration and production guidance in speaker notes while standalone text assets are also written. This keeps the deck useful as a teaching artifact and the media pipeline independently editable.
+The PPTX embeds narration and production guidance in speaker notes while standalone text assets are also written.
 
-## TTS architecture
+## TTS and media boundary
 
 TTS is downstream from instructional authoring. Changing voice should not regenerate the course content.
 
-The TTS provider layer currently supports:
+The provider layer currently supports Google Cloud Chirp 3 HD as the production default and Windows SAPI as fallback/offline option. Scientific speech normalization converts common notation conservatively before synthesis.
 
-- `google_cloud_chirp3` — production default;
-- `sapi` — Windows fallback/offline option.
-
-The default Chirp configuration uses `en-GB-Chirp3-HD-Leda`, but voice, locale, speaking rate, endpoint location, fallback behavior, and scientific normalization are configuration data.
-
-Scientific speech normalization converts common notation conservatively before synthesis. For a difficult expression, `tts_text` explicitly controls the spoken rendering while `equation_latex` preserves exact mathematics on screen.
-
-Every generated video stores `tts_manifest.yaml` containing the actual provider, voice, audio file, language, and spoken text used per slide.
-
-## Media and approval gate
-
-The complete Windows media path is:
+The final Windows media path is:
 
 ```text
 PPTX -> PowerPoint PNG export
@@ -122,8 +165,8 @@ PNG + audio -> FFmpeg segment
 segments -> final MP4
 ```
 
-Final media rendering is blocked unless the lesson manifest is `editorial_status: approved`, except when `--allow-draft` is deliberately used for a private preview.
+Human scientific/editorial approval remains a separate gate. Final media rendering is blocked unless the lesson manifest is `editorial_status: approved`, except when `--allow-draft` is deliberately used for a private preview.
 
-## Repository-name independence
+## Large-document boundary
 
-The repository slug is presentation/discovery metadata, not a runtime dependency. Internal documentation should use relative links. Scripts intended to create a new copy default to `microcredential-video-generator`. A GitHub repository rename therefore does not require changes to source selection, profiles, generated workspaces, package imports, or the `microvid` CLI.
+v0.6.0 intentionally sends the complete structured source in the global planning pass and refuses silent truncation. The default global limit is 800,000 prompt-facing source characters. Very large books should eventually use a hierarchical planner rather than relying on arbitrary truncation or blind context-limit increases.
