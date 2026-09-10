@@ -22,8 +22,9 @@ course:
     thinking_level: high
     api_key_env: GEMINI_API_KEY
     review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
-    prompt_set: global_design_v1+microcredential_v2
+    prompt_set: global_design_v1+microcredential_v3+narration_polish_v1
     global_design:
       enabled: true
       max_source_characters: 800000
@@ -36,6 +37,6 @@ course:
     source_words_per_slide: 110
     max_context_blocks: 6
 
-# Intentionally empty in the v0.6.0 production workflow.
+# Intentionally empty in the global-first production workflow.
 # Gemini reads the complete structured DOCX first and creates the actual video sequence.
 videos: []
