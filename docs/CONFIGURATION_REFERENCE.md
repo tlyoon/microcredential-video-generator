@@ -1,6 +1,6 @@
 # Configuration Reference
 
-This document describes the configuration surfaces of **Microcredential Video Generator v0.6.0**. The production default is whole-document Gemini course design followed by globally informed lesson generation and final whole-course consistency review.
+This document describes the configuration surfaces of **Microcredential Video Generator v0.7.0**. The production default is whole-document Gemini course design, globally informed lesson generation/review, a dedicated narration-only polish pass, whole-course consistency review, then local slide/TTS/media production.
 
 ## 1. Configuration precedence
 
@@ -15,7 +15,7 @@ For TTS, settings are resolved in this order, from lowest to highest priority:
 
 ## 2. Course profile in global mode
 
-A v0.6.0 global-mode profile is primarily a **constraint profile**. It should describe the audience, source role, parser behavior, timing targets, LLM settings, editorial policy, and TTS preferences. It does not need to predefine the videos.
+A global-mode profile is primarily a **constraint profile**. It describes the audience, source role, parser behavior, timing targets, LLM settings, editorial policy, and TTS preferences. It does not need to predefine the videos.
 
 Example:
 
@@ -37,7 +37,9 @@ course:
     thinking_level: high
     api_key_env: GEMINI_API_KEY
     review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
+    prompt_set: global_design_v1+microcredential_v3+narration_polish_v1
     global_design:
       enabled: true
       max_source_characters: 800000
@@ -92,6 +94,7 @@ course:
     thinking_level: high
     api_key_env: GEMINI_API_KEY
     review_pass: true
+    narration_polish_pass: true
     max_source_characters_per_lesson: 220000
 ```
 
@@ -103,11 +106,49 @@ course:
 
 `api_key_env` — environment variable containing the Gemini API key.
 
-`review_pass` — normal lesson generation uses a generation pass followed by a grounded lesson review/revision pass.
+`review_pass` — normal lesson construction uses a generation pass followed by a grounded scientific/pedagogical lesson review/revision pass.
+
+`narration_polish_pass` — enables the dedicated narration-only Gemini editor after lesson content and structure have been settled. The engine defaults this to `true` even when an older profile omits the field. Set it to `false` only for deliberate cost/diagnostic comparisons.
 
 `max_source_characters_per_lesson` — fail-visible upper bound for an individual lesson source packet. The package does not silently truncate a lesson packet.
 
-## 5. Global-design settings
+## 5. Dedicated narration-polish behavior
+
+The narration editor receives the fixed lesson, source packet, global course context, slide timing, visual directions, equations, and current narration. Its structured output may contain only:
+
+```yaml
+slides:
+  - slide_id: V03S01
+    narration: >
+      Polished natural spoken script.
+    tts_text: null
+```
+
+The editor cannot return a replacement title, on-screen bullets, equation, source IDs, visual direction, or slide structure. Local code verifies that every existing slide ID is returned exactly once.
+
+After polishing, the manifest records:
+
+```yaml
+generation:
+  narration_polish:
+    enabled: true
+    provider: gemini
+    model: ...
+    prompt_set: narration_polish_v1
+
+slides:
+  - id: V03S01
+    narration_word_count: 83
+    narration_estimated_spoken_seconds: 38.3
+```
+
+An optional `tts_text` is retained when a more explicit spoken rendering is useful for equations, units, abbreviations, or symbols.
+
+The local narration quality checker rejects obvious raw LaTeX/markup or internal production-language contamination in the final narration and warns when the word count is too dense for the assigned `estimated_seconds` at the configured `narration_wpm`.
+
+See [NARRATION_QUALITY.md](NARRATION_QUALITY.md) for the full script-writing contract.
+
+## 6. Global-design settings
 
 ```yaml
 course:
@@ -130,7 +171,7 @@ course:
 
 `course_consistency_review` — policy marker for the final cross-lesson review. CLI option `--no-global-consistency-review` can deliberately disable it.
 
-## 6. Global plan output
+## 7. Global plan output
 
 The reviewed plan is stored at:
 
@@ -164,7 +205,7 @@ videos:
 
 The `source_signature` is computed from the complete prompt-facing extraction. A plan is reusable only when the current extraction has the same signature.
 
-## 7. Global-design CLI controls
+## 8. Global-design CLI controls
 
 Normal global planning after extraction:
 
@@ -189,13 +230,15 @@ One-command builds replan by default. Reuse is allowed only when the existing pl
 microvid all ... --reuse-plan
 ```
 
-Development/cost overrides:
+Development/cost overrides include:
 
 ```text
 --no-plan-review-pass
 --no-review-pass
 --no-global-consistency-review
 ```
+
+Narration polish is profile-controlled through `course.llm.narration_polish_pass` rather than a CLI flag so the production policy is recorded in the course configuration.
 
 Compatibility path using locally predefined `videos`:
 
@@ -209,7 +252,7 @@ Deterministic generation requires profile mode:
 --generator deterministic --design-mode profile
 ```
 
-## 8. Legacy/profile-mode lesson definitions
+## 9. Legacy/profile-mode lesson definitions
 
 Existing course profiles may still contain lesson definitions such as:
 
@@ -223,9 +266,7 @@ videos:
 
 These definitions are ignored by normal global mode. They are used only when `--design-mode profile` is requested or by deterministic legacy/debug generation.
 
-This preserves backward compatibility without allowing old hand-authored segmentation to constrain the new production design.
-
-## 9. Whole-course consistency review
+## 10. Whole-course consistency review
 
 Global builds create:
 
@@ -234,18 +275,13 @@ workspace/<course>/manifests/global_consistency_initial.yaml
 workspace/<course>/manifests/global_consistency_final.yaml
 ```
 
-Possible status values are:
+Possible status values are `ready` and `revision_required`.
 
-```text
-ready
-revision_required
-```
-
-The initial review may issue targeted revision instructions for one or more videos. Those lessons are regenerated using their assigned source blocks plus global context. A final verification is then performed.
+The initial review may issue targeted revision instructions for one or more videos. Those lessons are regenerated using their assigned source blocks plus global context. In v0.7.0, any lesson changed by this targeted consistency revision is sent through the dedicated narration-polish pass again before final course verification.
 
 If blocking issues remain, normal `microvid slides` is blocked. `--allow-unreviewed-course` exists only as a diagnostic override.
 
-## 10. Standalone TTS configuration
+## 11. Standalone TTS configuration
 
 Example file:
 
@@ -288,7 +324,7 @@ tts:
 
 `fallback_provider` / `fallback_on_error` — optional secondary TTS behavior. For final production, `--no-tts-fallback` is recommended when voice consistency is essential.
 
-## 11. Per-slide TTS overrides
+## 12. Per-slide TTS overrides
 
 ```yaml
 narration: >
@@ -303,7 +339,7 @@ tts_text: >
 
 `tts_text` affects speech only. A small `tts_replacements` mapping may also be supplied for local pronunciation corrections.
 
-## 12. Credentials
+## 13. Credentials
 
 Gemini:
 
@@ -319,7 +355,7 @@ gcloud auth application-default login
 
 Do not commit API keys, OAuth tokens, service-account JSON, or other credentials.
 
-## 13. Runtime source and workspace isolation
+## 14. Runtime source and workspace isolation
 
 Every build requires an explicit source path. The bundled sample DOCX is never selected automatically.
 
