@@ -4,9 +4,9 @@
 
 Earlier releases selected lesson-sized source packets from a hand-authored YAML profile before Gemini generated slides. That approach was source-grounded, but it constrained Gemini to local lesson boundaries chosen before the model had read the complete source document.
 
-From v0.6.0, the production default is **global-first**:
+The production default is now **global-first**:
 
-> Gemini reads the complete structured source document first, creates a global concept/course map, decides the video boundaries, and only then generates individual slide stacks and narration.
+> Gemini reads the complete structured source document first, creates a global concept/course map, decides the video boundaries, and only then generates individual slide stacks. After scientific/pedagogical lesson review, a separate Gemini narration editor polishes the spoken script without changing the slide structure or science.
 
 The pre-segmented profile workflow remains available only as an explicit compatibility/debug path.
 
@@ -48,8 +48,7 @@ FOR EACH VIDEO
       │
       ▼
 GEMINI — LESSON GENERATION
-  slide stack
-  narration
+  slide stack + first narration
   lecturer notes
   visual directions
   equations
@@ -59,23 +58,29 @@ LOCAL PC
   deterministic lesson QA
       │
       ▼
-GEMINI — LESSON REVIEW/REVISION
+GEMINI — LESSON SCIENTIFIC/PEDAGOGICAL REVIEW
+      ↓
+GEMINI — DEDICATED NARRATION POLISH
+  rewrite spoken script only
+  preserve slide IDs/structure/science/provenance
+  optional TTS-specific wording
       ↓
 LOCAL PC
-  collect all lesson manifests
-      │
-      ▼
+  narration speech/timing QA
+      ↓
 GEMINI — WHOLE-COURSE CONSISTENCY REVIEW
   gaps / repetition / prerequisite order / terminology / notation / hand-offs
       ↓
   if required: targeted lesson revision calls
+      ↓
+  re-polish narration for any revised lesson
       ↓
 GEMINI — FINAL CONSISTENCY VERIFICATION
       ↓
 LOCAL PC
   manifests
   PowerPoint
-  notes / narration / SRT
+  notes / polished narration / SRT
   scientific-speech normalization
       │
       ▼
@@ -90,27 +95,9 @@ LOCAL PC
 
 ## What is sent during global planning
 
-The DOCX binary itself is not uploaded by this package. It is parsed locally first. Gemini receives a JSON representation containing every extracted semantic block:
+The DOCX binary itself is not uploaded by this package. It is parsed locally first. Gemini receives a JSON representation containing every extracted semantic block: ID, kind, section, heading level/path, text, readable math tokens, and whether Office Math is present. The complete packet also includes course constraints such as audience, target lesson duration, target total duration, maximum slides, source role, and editorial policy.
 
-```json
-{
-  "id": "b0142",
-  "kind": "paragraph",
-  "section": "8.2",
-  "heading_level": null,
-  "heading_path": [
-    "8. Propagation of uncertainty",
-    "8.2 Multiplication and division"
-  ],
-  "text": "...",
-  "math_text": ["..."],
-  "contains_office_math": true
-}
-```
-
-The complete packet also includes course constraints such as audience, target lesson duration, target total duration, maximum slides, source role, and editorial policy.
-
-Raw Office Math XML (OMML) remains local; readable math tokens are sent instead.
+Raw Office Math XML remains local; readable math tokens are sent instead.
 
 ## What the global plan contains
 
@@ -154,34 +141,37 @@ The plan stores a SHA-256 signature derived from the complete prompt-facing extr
 
 ## Per-video generation after global planning
 
-Gemini is not sent the complete source again for every video. Instead, each lesson call receives:
-
-1. the global course summary;
-2. the pedagogical strategy;
-3. the global concept map;
-4. the compact full video sequence;
-5. the current lesson's prerequisites, already-taught concepts, and forward links;
-6. that lesson's authoritative `core_block_ids` and source text;
-7. its optional `reference_block_ids` and source text.
+Gemini is not sent the complete source again for every video. Instead, each lesson call receives the global course summary, pedagogical strategy, concept map, compact full video sequence, current prerequisites/already-taught/forward-link context, and that lesson's authoritative/reference source blocks.
 
 This keeps the local call focused while preserving knowledge of the lesson's place in the whole course.
 
+## Dedicated narration polishing after lesson review
+
+The first two lesson calls optimize lesson structure, scientific fidelity and pedagogy. Narration quality is important during those passes, but v0.7.0 no longer assumes that the resulting script is final.
+
+A separate Gemini call then receives the fixed lesson manifest and the same source/global context. Its response schema only permits:
+
+```yaml
+slides:
+  - slide_id: V01S01
+    narration: >
+      polished spoken script
+    tts_text: null
+```
+
+This pass cannot redesign the lesson. The local package rejects missing/duplicate/unknown slide IDs and rejects obvious raw LaTeX or internal production language in the polished narration. Word count and estimated spoken duration are recorded for each slide, with warnings when the script is too dense for the assigned timing.
+
+The narration prompt explicitly emphasizes writing for the ear, smooth slide-to-slide continuity, visual synchronization, explanation rather than bullet recitation, natural sentence rhythm, concise lecturer-like tone, mathematical speech readiness, and avoidance of generic AI/filler phrases.
+
+See [NARRATION_QUALITY.md](NARRATION_QUALITY.md).
+
 ## Whole-course consistency review
 
-After all individual lessons have been generated and reviewed, Gemini sees the global plan together with compact versions of every generated lesson. It checks for course-level problems that are hard to detect one lesson at a time, including:
+After all individual lessons have been generated, reviewed and narration-polished, Gemini sees the global plan together with compact versions of every lesson. It checks for course-level problems including missing concepts, accidental repetition, prerequisite violations, inconsistent terminology/notation/units/definitions, premature later-course concepts, poor transitions, duplicated checks/takeaways, and drift from the global plan.
 
-- missing concepts;
-- accidental repetition;
-- prerequisite violations;
-- inconsistent terminology, notation, units, or definitions;
-- premature introduction of later-course concepts;
-- poor transitions between neighboring videos;
-- duplicate or weak checks/takeaways;
-- mismatch between generated lessons and the global course plan.
+The reviewer returns either `ready` or `revision_required` plus targeted revision instructions. The package can automatically re-open only the affected lessons, with their source packets and global context. Any revised lesson is narration-polished again before final course verification.
 
-The reviewer returns either `ready` or `revision_required` plus targeted revision instructions. The package can automatically re-open only the affected lessons, with their source packets and global context, then run a final course verification.
-
-If blocking issues remain, the draft manifests and review reports are saved but normal slide production is blocked.
+If blocking issues remain, draft manifests and review reports are saved but normal slide production is blocked.
 
 Review files are written under:
 
@@ -232,6 +222,16 @@ These options deliberately weaken parts of the normal production workflow and sh
 --design-mode profile
 ```
 
+Narration polish is controlled in the course profile:
+
+```yaml
+course:
+  llm:
+    narration_polish_pass: true
+```
+
+It defaults to true when omitted. Disable it only for deliberate cost/diagnostic comparisons.
+
 The deterministic builder cannot perform global semantic reasoning. Therefore deterministic generation must be requested explicitly with the legacy profile design mode:
 
 ```powershell
@@ -240,6 +240,6 @@ microvid all ... --generator deterministic --design-mode profile
 
 ## Very large documents
 
-The current v0.6.0 global planner sends the complete structured source in the planning request and refuses to truncate silently. The configurable limit defaults to 800,000 source characters.
+The current global planner sends the complete structured source in the planning request and refuses to truncate silently. The configurable limit defaults to 800,000 source characters.
 
 For a source larger than that limit, the package fails visibly. A future hierarchical planner can summarize chapters/major units first and then perform global synthesis. Raising the limit blindly is not equivalent to a well-designed hierarchical strategy.
