@@ -15,6 +15,7 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 - [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
 - [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
 - [Physics Lab 101 pilot workflow](docs/PILOT_WORKFLOW.md)
+- [Repository rename migration](docs/REPOSITORY_RENAME.md)
 - [Changelog](CHANGELOG.md)
 
 ## Production architecture
@@ -180,4 +181,4 @@ This keeps automatic generation separate from scientific/editorial acceptance.
 
 ## Repository naming
 
-The software is generic, so the preferred repository slug is `microcredential-video-generator`. Internal documentation uses relative links and the Python package/CLI do not depend on the GitHub repository slug, so renaming the GitHub repository does not change runtime behavior.
+The software is generic, so the preferred repository slug is `microcredential-video-generator`. Internal documentation uses relative links and the Python package/CLI do not depend on the GitHub repository slug, so renaming the GitHub repository does not change runtime behavior. See [REPOSITORY_RENAME.md](docs/REPOSITORY_RENAME.md) for migration steps.
