@@ -2,6 +2,23 @@
 
 All notable project changes are summarized here.
 
+## 0.7.0 — Dedicated Gemini narration polishing
+
+- Promoted narration to a first-class production artifact rather than accepting the script directly from the general slide-generation/review pass.
+- Added `src/microvid/prompts/narration_polish.md`, a detailed spoken-script editorial contract covering natural lecturer voice, continuity, visual synchronization, timing, TTS readiness, equation verbalization, assessment pauses, and anti-patterns.
+- Added a separate narration-only Gemini call after lesson generation and grounded scientific/pedagogical review.
+- Restricted the narration-polish response schema to existing `slide_id`, polished `narration`, and optional `tts_text`, preventing that pass from redesigning slides, changing equations, or altering source provenance.
+- Added local enforcement that every existing slide is returned exactly once and in the same lesson structure.
+- Added narration speech-hygiene checks for raw LaTeX/markup and internal production/meta language.
+- Added timing-density warnings based on `estimated_seconds` and configured narration words per minute.
+- Added `narration_word_count` and `narration_estimated_spoken_seconds` to polished slide records.
+- Added generation provenance under `generation.narration_polish`.
+- If whole-course consistency review requires a targeted lesson revision, narration polishing is run again for that revised lesson before final verification.
+- Strengthened the upstream system narration contract so first-pass scripts are already coherent, speech-oriented, visually synchronized, and free of common filler.
+- Added `course.llm.narration_polish_pass`, enabled by default for bundled and newly scaffolded profiles. Older profiles that omit the setting also default to enabled.
+- Added `docs/NARRATION_QUALITY.md` and updated README/configuration/manual documentation.
+- Added regression coverage proving that the dedicated narration pass runs and preserves slide/source provenance.
+
 ## 0.6.0 — Global-first Gemini course design
 
 - Replaced the production default in which YAML lesson boundaries were chosen before Gemini saw the source.
