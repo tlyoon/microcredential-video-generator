@@ -12,10 +12,11 @@ from .docx_parser import write_extraction
 from .manifest_builder import build_all_manifests
 from .llm import provider_from_config
 from .llm_manifest_builder import build_all_manifests_with_llm
-from .media import build_windows_video, media_capabilities
+from .media import audition_voices, build_windows_video, media_capabilities
 from .profile import load_profile
 from .qa import validate_workspace
 from .slides import build_pptx
+from .tts import TTSConfig
 
 
 def _extraction_path(workspace: Path) -> Path:
@@ -26,6 +27,30 @@ def _parser_config(profile_name: str | None) -> dict | None:
     if not profile_name:
         return None
     return load_profile(profile_name).get("parser")
+
+
+def _tts_config_from_args(args) -> TTSConfig:
+    data: dict = {}
+    profile_name = getattr(args, "profile", None)
+    if profile_name:
+        profile = load_profile(profile_name)
+        data.update(profile.get("course", {}).get("tts", {}) or {})
+
+    tts_config_path = getattr(args, "tts_config", None)
+    if tts_config_path:
+        raw = yaml.safe_load(Path(tts_config_path).read_text(encoding="utf-8")) or {}
+        data.update(raw.get("tts", raw))
+
+    cfg = TTSConfig.from_mapping(data).with_overrides(
+        provider=getattr(args, "tts_provider", None),
+        voice_name=getattr(args, "voice_name", None),
+        language_code=getattr(args, "language_code", None),
+        speaking_rate=getattr(args, "speaking_rate", None),
+        location=getattr(args, "tts_location", None),
+    )
+    if getattr(args, "no_tts_fallback", False):
+        cfg = cfg.with_overrides(fallback_on_error=False, fallback_provider=None)
+    return cfg
 
 
 def cmd_extract(args) -> int:
@@ -117,14 +142,43 @@ def cmd_all(args) -> int:
 
 
 def cmd_media(args) -> int:
-    output = build_windows_video(args.workspace, args.video, allow_draft=args.allow_draft)
-    print(f"Built {output}")
+    cfg = _tts_config_from_args(args)
+    output = build_windows_video(
+        args.workspace,
+        args.video,
+        allow_draft=args.allow_draft,
+        tts_config=cfg,
+    )
+    print(f"Built {output} using TTS provider {cfg.provider}, voice {cfg.voice_name}")
+    return 0
+
+
+def cmd_tts_audition(args) -> int:
+    cfg = _tts_config_from_args(args)
+    text = args.text or (
+        "A measured value is incomplete without its uncertainty and units. "
+        "For example, an acceleration of 9.81 m s⁻² ± 0.02 m s⁻² should be reported clearly."
+    )
+    paths = audition_voices(args.output_dir, text, cfg, voices=args.voices)
+    for path in paths:
+        print(f"Built {path}")
     return 0
 
 
 def cmd_media_check(args) -> int:
     print(yaml.safe_dump(media_capabilities(), sort_keys=False))
     return 0
+
+
+def _add_tts_options(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--profile", default="physics_lab_101", help="Course profile; may contain course.tts settings")
+    p.add_argument("--tts-config", help="Optional standalone YAML file. Use either a top-level tts: mapping or the mapping itself.")
+    p.add_argument("--tts-provider", choices=["google_cloud_chirp3", "sapi"], help="Override configured TTS provider")
+    p.add_argument("--voice-name", help="Override Google Cloud voice, e.g. en-GB-Chirp3-HD-Leda")
+    p.add_argument("--language-code", help="Override TTS locale, e.g. en-GB")
+    p.add_argument("--speaking-rate", type=float, help="Override TTS speaking rate; Chirp 3 HD supports pace control where available")
+    p.add_argument("--tts-location", help="Google Cloud TTS location, e.g. global or asia-southeast1")
+    p.add_argument("--no-tts-fallback", action="store_true", help="Fail instead of falling back to the configured secondary TTS provider")
 
 
 def parser() -> argparse.ArgumentParser:
@@ -180,11 +234,19 @@ def parser() -> argparse.ArgumentParser:
     m = sp.add_parser("media-check", help="Report local media-production capabilities")
     m.set_defaults(func=cmd_media_check)
 
-    mv = sp.add_parser("media", help="Render an approved lesson to MP4 on Windows using PowerPoint + SAPI + ffmpeg")
+    mv = sp.add_parser("media", help="Render an approved lesson to MP4 on Windows using PowerPoint + configurable TTS + ffmpeg")
     mv.add_argument("--workspace", required=True)
     mv.add_argument("--video", required=True, help="Video id, e.g. V05")
     mv.add_argument("--allow-draft", action="store_true", help="Allow private preview rendering before editorial approval")
+    _add_tts_options(mv)
     mv.set_defaults(func=cmd_media)
+
+    av = sp.add_parser("tts-audition", help="Synthesize the same sample narration with several candidate voices")
+    av.add_argument("--output-dir", required=True)
+    av.add_argument("--text", help="Optional audition text; a short scientific sample is used by default")
+    av.add_argument("--voice", action="append", dest="voices", help="Voice to audition; repeat for multiple voices")
+    _add_tts_options(av)
+    av.set_defaults(func=cmd_tts_audition)
     return p
 
 
