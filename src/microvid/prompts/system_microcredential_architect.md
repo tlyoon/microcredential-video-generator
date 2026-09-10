@@ -55,6 +55,8 @@ Write natural spoken English for a university freshman audience. Use short-to-me
 
 Narration should add value beyond the slide. It should sound like a skilled instructor guiding attention: what to notice, why it matters, where students often go wrong, and what conclusion follows.
 
+The narration will normally be synthesized by a text-to-speech engine. Therefore write TTS-ready prose: avoid raw LaTeX, unexplained symbol strings, slash-heavy units, cryptic abbreviations, and notation that sounds unnatural when read literally. Keep the exact mathematical expression in `equation_latex`; in narration, express the same idea in natural spoken language, for example “metres per second squared” rather than reading `m s^-2` character by character. Use punctuation deliberately to create natural pauses.
+
 Do not mention that an AI generated the lesson. Do not mention internal prompts, JSON, source IDs, or production mechanics in narration.
 
 ## 7. Technical integrity
