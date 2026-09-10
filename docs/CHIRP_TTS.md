@@ -1,8 +1,8 @@
 # Google Cloud Chirp 3 HD TTS
 
-The production TTS default is Google Cloud Text-to-Speech using a Chirp 3 HD female voice. Windows SAPI remains available as a fallback.
+This guide describes the production text-to-speech layer used by **Microcredential Video Generator v0.5.0**. TTS is deliberately independent of course subject matter and independent of the LLM that writes the lesson.
 
-## Default voice
+## Default configuration
 
 ```yaml
 tts:
@@ -17,21 +17,29 @@ tts:
   fallback_on_error: true
 ```
 
-`en-GB-Chirp3-HD-Leda` is a female Chirp 3 HD voice. The voice is configuration data; it is not hard-coded into the media renderer.
+The default voice is configuration data, not hard-coded in the renderer. A different supported Chirp 3 HD voice or locale can be selected without changing Python.
 
-## Local Google Cloud authentication
+## Authentication
 
-Install/update the package, enable Cloud Text-to-Speech in the Google Cloud project used for production, then configure Application Default Credentials. A common local setup is:
+Install/update the Python package, enable Cloud Text-to-Speech in the Google Cloud project used for production, and configure Application Default Credentials on the workstation. A common local setup is:
 
 ```powershell
 gcloud auth application-default login
 ```
 
-Alternatively, point `GOOGLE_APPLICATION_CREDENTIALS` to an authorized service-account credential file if that is how the workstation is managed.
+A managed workstation may alternatively set `GOOGLE_APPLICATION_CREDENTIALS` to an authorized service-account file.
 
-No Google credential or key file belongs in Git.
+Never commit Google credentials, API keys, OAuth tokens, or service-account JSON files to Git.
 
-## Audition three female voices
+## Voice audition
+
+The repository includes a standalone example:
+
+```text
+examples/tts/chirp3.example.yaml
+```
+
+Audition the configured candidate voices using identical scientific narration:
 
 ```powershell
 microvid tts-audition `
@@ -39,13 +47,13 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-The packaged audition list is:
+The packaged candidate list currently includes:
 
 - `en-GB-Chirp3-HD-Leda`
 - `en-GB-Chirp3-HD-Aoede`
 - `en-GB-Chirp3-HD-Kore`
 
-A different voice can be tested without editing code:
+To audition a different voice:
 
 ```powershell
 microvid tts-audition `
@@ -54,28 +62,64 @@ microvid tts-audition `
   --language-code en-US
 ```
 
-## Use Chirp when rendering a lesson
+Repeat `--voice` when several explicit candidates should be compared.
+
+## Render a video with Chirp
 
 ```powershell
 microvid media `
-  --workspace ".\workspace\lab101" `
-  --video V05 `
+  --workspace ".\workspace\course" `
+  --video V01 `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-CLI options can override configuration values, for example:
+The same command works for Physics Lab 101 or any other course workspace.
+
+### Override a voice
 
 ```powershell
 microvid media `
-  --workspace ".\workspace\lab101" `
-  --video V05 `
-  --voice-name en-GB-Chirp3-HD-Aoede `
+  --workspace ".\workspace\course" `
+  --video V01 `
+  --voice-name en-GB-Chirp3-HD-Aoede
+```
+
+### Override speaking rate
+
+```powershell
+microvid media `
+  --workspace ".\workspace\course" `
+  --video V01 `
   --speaking-rate 0.95
+```
+
+### Select SAPI explicitly
+
+```powershell
+microvid media `
+  --workspace ".\workspace\course" `
+  --video V01 `
+  --tts-provider sapi
 ```
 
 ## Scientific speech normalization
 
-The slide manifest keeps the scientifically exact on-screen equation separately from the narration. Before TTS, the media layer conservatively normalizes common notation such as:
+The exact mathematics shown to students and the text spoken by TTS are separate representations.
+
+For example:
+
+```yaml
+equation_latex: >
+  g = \frac{4\pi^2}{m}
+
+narration: >
+  The fitted slope can be used to obtain gravitational acceleration.
+
+tts_text: >
+  g equals four pi squared divided by the fitted slope.
+```
+
+The normalizer conservatively handles common notation such as:
 
 - `±` -> `plus or minus`
 - `m s⁻²` -> `metres per second squared`
@@ -83,12 +127,52 @@ The slide manifest keeps the scientifically exact on-screen equation separately 
 - `Ω` -> `ohms`
 - `π` -> `pi`
 
-This is intentionally not a full LaTeX-to-speech system. If a particular expression needs a precise reading, a slide may provide `tts_text` in its YAML manifest. `tts_text` is used for speech while the normal `narration` remains the human-readable script.
+This is intentionally not a universal LaTeX-to-speech system. Use explicit `tts_text` for an expression that needs a precise spoken rendering.
 
-A slide may also provide a small `tts_replacements` mapping for local pronunciation overrides.
+A slide may also define local corrections:
+
+```yaml
+tts_replacements:
+  "u_xbar": "standard uncertainty of the mean"
+```
+
+The LLM system prompt is designed to reduce normalization burden by writing narration as natural spoken prose and keeping exact symbolic mathematics in `equation_latex`.
 
 ## Fallback behavior
 
-If Chirp synthesis fails and `fallback_on_error: true`, the renderer attempts the configured fallback provider. The default fallback is Windows SAPI. The generated `audio/video_NN/tts_manifest.yaml` records which provider and voice actually produced every slide, so an unnoticed fallback cannot be mistaken for Chirp output.
+If Chirp fails and the configuration permits fallback, Windows SAPI is attempted. For private previews this can be convenient. For final production, voice consistency is usually more important, so use:
 
-For final production, use `--no-tts-fallback` if you want the build to fail rather than change voice.
+```powershell
+microvid media ... --no-tts-fallback
+```
+
+This forces the build to fail instead of silently changing narrator.
+
+## TTS provenance
+
+For every rendered lesson, the package writes:
+
+```text
+workspace/<course>/audio/video_NN/tts_manifest.yaml
+```
+
+It records the requested TTS configuration and, for each slide:
+
+- actual provider used;
+- actual voice used;
+- language code;
+- audio file path;
+- normalized spoken text.
+
+This makes an accidental fallback or voice mismatch auditable.
+
+## Configuration precedence
+
+TTS values are resolved from:
+
+1. built-in defaults;
+2. `course.tts` in the selected course profile;
+3. `--tts-config` YAML;
+4. explicit CLI overrides.
+
+See [CONFIGURATION_REFERENCE.md](CONFIGURATION_REFERENCE.md) for the complete configuration contract.

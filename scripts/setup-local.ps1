@@ -5,5 +5,5 @@ py -m venv .venv
 python -m pip install --upgrade pip
 pip install -e ".[dev,windows]"
 
-Write-Host "Local environment ready."
-Write-Host "Copy the corrected Lab 101 DOCX into .\source and run the command shown in README.md."
+Write-Host "Microcredential Video Generator local environment ready."
+Write-Host "Next: read .\docs\USER_MANUAL.md, configure Gemini and TTS credentials, and run microvid with an explicit --source DOCX path."
