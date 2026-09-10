@@ -1,5 +1,5 @@
 param(
-    [string]$RepositoryName = "physics-lab-microcredential-video-generator",
+    [string]$RepositoryName = "microcredential-video-generator",
     [ValidateSet("private", "public")]
     [string]$Visibility = "private"
 )
