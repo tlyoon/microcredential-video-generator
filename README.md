@@ -1,9 +1,9 @@
 # Microcredential Video Generator
 
-A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using LLM-authored slide abstraction, PowerPoint generation, configurable text-to-speech, and FFmpeg assembly.
+A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using whole-document Gemini course design, LLM-authored slide/narration generation, PowerPoint, configurable TTS, and FFmpeg assembly.
 
-**Recommended GitHub repository name:** `microcredential-video-generator`  
-**Current package version:** `0.5.0`  
+**Repository:** `tlyoon/microcredential-video-generator`  
+**Current package version:** `0.6.0`  
 **CLI command:** `microvid`
 
 Physics Laboratory 101 is the bundled reference implementation and sample course profile. The engine itself is topic-neutral.
@@ -11,39 +11,62 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 ## Start here
 
 - [Complete user manual](docs/USER_MANUAL.md)
+- [Global-first design](docs/GLOBAL_DESIGN.md)
 - [Architecture and genericity contract](docs/ARCHITECTURE.md)
 - [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
 - [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
 - [Physics Lab 101 pilot workflow](docs/PILOT_WORKFLOW.md)
-- [Repository rename migration](docs/REPOSITORY_RENAME.md)
 - [Changelog](CHANGELOG.md)
 
 ## Production architecture
 
+The production default is now **global-first**. Gemini sees the complete structured source document before any video boundaries or slide decks are created.
+
 ```text
 Explicit runtime DOCX
-   -> semantic extraction + source provenance
-   -> profile-driven lesson source packets
-   -> Google Gemini lesson abstraction by default
-   -> grounded LLM review/revision
-   -> structured slide manifests
-      - concise on-screen content
-      - full narration per slide
-      - lecturer notes
-      - visual/build directions
-      - equations and source block IDs
-   -> PowerPoint decks with speaker notes
-   -> narration / notes / subtitle assets
-   -> scientific-speech normalization
+   -> LOCAL semantic extraction + provenance
+   -> GEMINI whole-document comprehension + course segmentation
+   -> LOCAL validation of global plan/source IDs
+   -> GEMINI global-plan review/revision
+   -> global course map + video block assignments
+   -> for each video:
+        global map + sequence context + assigned source blocks
+        -> GEMINI slide stack + narration
+        -> LOCAL deterministic QA
+        -> GEMINI grounded lesson review/revision
+   -> GEMINI whole-course consistency review
+        -> targeted lesson revisions if needed
+        -> final consistency verification
+   -> LOCAL YAML manifests
+   -> LOCAL PowerPoint decks + speaker notes
+   -> LOCAL narration / notes / subtitle assets
+   -> LOCAL scientific-speech normalization
    -> Google Cloud Chirp 3 HD TTS by default
-   -> rendered slide + audio segments
-   -> FFmpeg
+   -> LOCAL PowerPoint rendering + FFmpeg
    -> MP4
 ```
 
-## Source document policy
+The old workflow, in which a YAML profile predefines video boundaries before Gemini sees the content, remains only as an explicit compatibility/debug path:
 
-The runtime source is always explicit:
+```powershell
+--design-mode profile
+```
+
+## What Gemini receives
+
+The DOCX file itself is parsed locally. For global planning, Gemini receives the **complete structured extraction**: block IDs, headings, heading paths, paragraph/table text, readable Office Math tokens, course constraints, and the global planning prompt. Raw OMML XML stays local.
+
+For an individual video, Gemini receives:
+
+- the global course summary and concept map;
+- the complete planned video sequence;
+- prerequisite/already-taught/forward-link context;
+- only that video's authoritative core blocks and supporting reference blocks;
+- the lesson-generation/review prompts and JSON schema.
+
+This gives Gemini global understanding without repeatedly sending the entire source for every slide-generation call.
+
+## Normal first run
 
 ```powershell
 microvid all `
@@ -52,13 +75,54 @@ microvid all `
   --profile my_course
 ```
 
-The tracked Lab 101 document under `examples/sample_docs/` is sample/reference data only. It is never selected automatically and is never a hidden fallback.
+`microvid all` now performs extraction, fresh whole-document planning, lesson generation/review, whole-course consistency review, PowerPoint generation, and validation.
 
-The parser is pagination-independent. It works from Word structure, heading paths, block type, source order, tables, paragraphs, and Office Math provenance rather than rendered page numbers.
+For a staged workflow:
 
-## LLM authoring
+```powershell
+microvid extract `
+  --source ".\source\my_course.docx" `
+  --workspace ".\workspace\my_course" `
+  --profile my_course
 
-LLM generation is the normal content-authoring path. The bundled provider is Google Gemini through the official `google-genai` SDK. Provider/model settings are profile data rather than hard-coded into the engine.
+microvid plan `
+  --workspace ".\workspace\my_course" `
+  --profile my_course
+
+microvid draft `
+  --workspace ".\workspace\my_course" `
+  --profile my_course
+
+microvid slides `
+  --workspace ".\workspace\my_course"
+```
+
+The global plan is saved to:
+
+```text
+workspace/my_course/plans/course_plan.yaml
+```
+
+It carries a source signature. If the extracted DOCX changes, a stale plan is rejected/rebuilt rather than reused silently.
+
+## New topic
+
+`scaffold-profile` now creates **course/parser/LLM constraints only**. It intentionally does not guess video boundaries from Heading 1 sections.
+
+```powershell
+microvid scaffold-profile `
+  --source ".\source\Introduction_to_Heat_Transfer.docx" `
+  --workspace ".\workspace\heat_transfer" `
+  --output ".\profiles\heat_transfer.yaml" `
+  --course-id "heat_transfer" `
+  --title "Introduction to Heat Transfer"
+```
+
+Review the generated course constraints and audience, then run `microvid all` with that profile. Gemini will read the complete structured document and decide the video boundaries.
+
+## LLM configuration
+
+The bundled provider is Google Gemini through `google-genai`:
 
 ```yaml
 course:
@@ -67,43 +131,19 @@ course:
     model: gemini-flash-latest
     thinking_level: high
     api_key_env: GEMINI_API_KEY
-    review_pass: true
+    max_source_characters_per_lesson: 220000
+    global_design:
+      max_source_characters: 800000
+      max_videos: 30
 ```
 
-Set the API key locally:
+Set the key locally:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
 ```
 
-A deterministic builder remains available only for offline/debugging work:
-
-```powershell
-microvid all ... --generator deterministic
-```
-
-## Slide/narration production record
-
-Each slide is represented as one production unit in YAML:
-
-```yaml
-id: V05S03
-slide_type: worked_example
-title: Which measurement dominates?
-onscreen:
-  - concise visible teaching content
-narration: >
-  Natural spoken explanation for this exact slide.
-lecturer_notes:
-  - teaching emphasis
-visual_direction: >
-  Show the two contributions sequentially.
-equation_latex: null
-source_block_ids: [b0214, b0215]
-estimated_seconds: 70
-```
-
-The same narration and production guidance are also written into PowerPoint speaker notes. Standalone narration, lecturer-note, and `.srt` subtitle assets are generated alongside the deck.
+No source packet is silently truncated. If the complete global source exceeds the configured global limit, planning fails visibly so a future hierarchical/chapter-level strategy can be chosen deliberately.
 
 ## TTS
 
@@ -122,8 +162,6 @@ tts:
   fallback_on_error: true
 ```
 
-Windows SAPI is retained as a fallback. Scientific notation is normalized conservatively before synthesis, and slides may provide `tts_text` or local `tts_replacements` when a specific spoken form is required.
-
 Voice audition:
 
 ```powershell
@@ -132,9 +170,27 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
+Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`.
+
+## Editorial gates
+
+Global Gemini consistency review happens **before slide production**. If blocking cross-course issues remain after the allowed targeted revision pass, draft manifests and review files are saved but slide generation is blocked.
+
+Individual lesson manifests still begin with:
+
+```yaml
+editorial_status: llm_draft_requires_review
+```
+
+Human scientific/editorial approval remains required before final media production:
+
+```yaml
+editorial_status: approved
+```
+
 ## Installation
 
-On Windows PowerShell:
+Windows PowerShell:
 
 ```powershell
 .\scripts\setup-local.ps1
@@ -148,37 +204,25 @@ py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev,windows]"
 ```
 
-Run the regression tests:
+Run regression tests:
 
 ```powershell
 .\.venv\Scripts\python.exe -m pytest
 ```
 
-## Generic use with another topic
+## Compatibility/debug path
 
-For a different structured DOCX, scaffold a profile first:
+The legacy local profile segmentation remains available deliberately, not silently:
 
 ```powershell
-microvid scaffold-profile `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
-  --workspace ".\workspace\heat_transfer" `
-  --output ".\profiles\heat_transfer.yaml" `
-  --course-id "heat_transfer" `
-  --title "Introduction to Heat Transfer"
+microvid draft `
+  --workspace ".\workspace\course" `
+  --profile my_profile `
+  --design-mode profile
 ```
 
-Review the generated YAML, then run the same extraction, LLM, PowerPoint, TTS, and MP4 pipeline. Python source changes should not be required for a similarly structured teaching document.
+Deterministic generation has no whole-document reasoning and therefore requires:
 
-## Editorial gate
-
-Generated manifests are not treated as publication-ready automatically. LLM output begins with a review-required status. Final media generation is blocked until the manifest is explicitly marked:
-
-```yaml
-editorial_status: approved
+```powershell
+--generator deterministic --design-mode profile
 ```
-
-This keeps automatic generation separate from scientific/editorial acceptance.
-
-## Repository naming
-
-The software is generic, so the preferred repository slug is `microcredential-video-generator`. Internal documentation uses relative links and the Python package/CLI do not depend on the GitHub repository slug, so renaming the GitHub repository does not change runtime behavior. See [REPOSITORY_RENAME.md](docs/REPOSITORY_RENAME.md) for migration steps.
