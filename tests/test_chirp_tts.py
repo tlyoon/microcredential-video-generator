@@ -15,11 +15,14 @@ def test_scientific_speech_normalization():
     assert "percent" in spoken
 
 
-def test_default_chirp_config_is_female_leda():
+def test_default_chirp_config_is_en_us_female():
     cfg = TTSConfig()
     assert cfg.provider == "google_cloud_chirp3"
-    assert cfg.language_code == "en-GB"
-    assert cfg.voice_name == "en-GB-Chirp3-HD-Leda"
+    assert cfg.language_code == "en-US"
+    assert cfg.voice_name == "en-US-Chirp-HD-F"
+    assert cfg.ssml_gender == "FEMALE"
+    assert cfg.audio_encoding == "LINEAR16"
+    assert cfg.speaking_rate == 0.9
     assert cfg.output_suffix == ".wav"
 
 

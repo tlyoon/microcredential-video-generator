@@ -7,10 +7,11 @@ This guide describes the production text-to-speech layer used by **Microcredenti
 ```yaml
 tts:
   provider: google_cloud_chirp3
-  language_code: en-GB
-  voice_name: en-GB-Chirp3-HD-Leda
+  language_code: en-US
+  voice_name: en-US-Chirp-HD-F
+  ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 1.0
+  speaking_rate: 0.9
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi

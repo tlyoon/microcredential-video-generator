@@ -32,10 +32,11 @@ def _is_transient_tts_error(exc: Exception) -> bool:
 @dataclass(frozen=True)
 class TTSConfig:
     provider: str = "google_cloud_chirp3"
-    language_code: str = "en-GB"
-    voice_name: str = "en-GB-Chirp3-HD-Leda"
+    language_code: str = "en-US"
+    voice_name: str = "en-US-Chirp-HD-F"
+    ssml_gender: str = "FEMALE"
     audio_encoding: str = "LINEAR16"
-    speaking_rate: float = 1.0
+    speaking_rate: float = 0.9
     location: str = "global"
     normalize_scientific_speech: bool = True
     fallback_provider: str | None = "sapi"
@@ -115,6 +116,11 @@ class GoogleCloudChirp3TTSProvider:
             encoding = getattr(texttospeech.AudioEncoding, encoding_name)
         except AttributeError as exc:
             raise ValueError(f"Unsupported Google Cloud TTS audio encoding: {encoding_name}") from exc
+        gender_name = self.config.ssml_gender.upper()
+        try:
+            ssml_gender = getattr(texttospeech.SsmlVoiceGender, gender_name)
+        except AttributeError as exc:
+            raise ValueError(f"Unsupported Google Cloud TTS SSML gender: {gender_name}") from exc
         response = None
         for attempt in range(4):
             try:
@@ -128,6 +134,7 @@ class GoogleCloudChirp3TTSProvider:
                     voice=texttospeech.VoiceSelectionParams(
                         language_code=self.config.language_code,
                         name=self.config.voice_name,
+                        ssml_gender=ssml_gender,
                     ),
                     audio_config=texttospeech.AudioConfig(
                         audio_encoding=encoding,

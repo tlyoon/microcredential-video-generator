@@ -42,7 +42,7 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-The default production voice is `en-GB-Chirp3-HD-Leda` unless locally changed.
+The default production voice is `en-US-Chirp-HD-F` unless locally changed.
 
 ## 3. Extract the authoritative runtime manual
 
