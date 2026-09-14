@@ -16,6 +16,7 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 - [Architecture and genericity contract](docs/ARCHITECTURE.md)
 - [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
 - [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
+- [YouTube course publishing](docs/YOUTUBE_PUBLISHING.md)
 - [Physics Lab 101 pilot workflow](docs/PILOT_WORKFLOW.md)
 - [Changelog](CHANGELOG.md)
 
@@ -211,6 +212,39 @@ For automatic Google Cloud authentication, place the service-account file at:
 ```
 
 If that preferred name is absent, the only `*.json` file in the directory is used. An explicitly configured `GOOGLE_APPLICATION_CREDENTIALS` environment variable always takes precedence. Keep the entire `%LOCALAPPDATA%\Microvid` directory private and never copy credentials into the repository.
+
+## Publish a complete course to YouTube
+
+The publishing workflow reads the generated course plan and lesson manifests, uses the
+reference playlist's editorial structure to generate original YouTube metadata, creates a
+square course image, uploads every MP4 and SRT, and builds an ordered playlist. Uploads are
+**public by default**.
+
+Add a Google OAuth **Desktop app** credential at:
+
+```text
+%LOCALAPPDATA%\Microvid\youtube_client_secret.json
+```
+
+Then publish the newest completed course under `workspace\`:
+
+```powershell
+microvid youtube publish --expected-channel "@tlyoon"
+```
+
+Or select a workspace explicitly:
+
+```powershell
+microvid youtube publish `
+  --workspace ".\workspace\lab101" `
+  --expected-channel "@tlyoon"
+```
+
+The first run opens a browser for YouTube authorization and stores the reusable token as
+`%LOCALAPPDATA%\Microvid\youtube_token.json`. The Google Cloud service-account file used
+for TTS cannot authorize personal YouTube uploads. See
+[YouTube course publishing](docs/YOUTUBE_PUBLISHING.md) for setup, preview, resume, and
+YouTube Course conversion details.
 
 ## Editorial gates
 

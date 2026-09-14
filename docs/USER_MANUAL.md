@@ -4,9 +4,14 @@
 **Repository:** `tlyoon/microcredential-video-generator`  
 **CLI command:** `microvid`
 
-This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, separately polished narration, PowerPoint slide decks, Google Cloud Chirp 3 HD audio, and final MP4 video.
+This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, separately polished narration, PowerPoint slide decks, Google Cloud Chirp 3 HD audio, final MP4 video, and optional YouTube course publishing.
 
 Physics Laboratory 101 is the bundled reference course. The engine itself is topic-neutral.
+
+For the final publishing stage, see [YOUTUBE_PUBLISHING.md](YOUTUBE_PUBLISHING.md). The
+publisher discovers completed courses under `workspace\`, produces original metadata and a
+course image, uploads the MP4/SRT set, creates the ordered playlist, and defaults to public
+visibility.
 
 ---
 

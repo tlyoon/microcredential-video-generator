@@ -4,6 +4,10 @@ All notable project changes are summarized here.
 
 ## Unreleased
 
+- Added a plug-and-play YouTube course publishing workflow with public-by-default uploads.
+- Added automatic completed-workspace discovery, template-informed Gemini metadata, a generated square course image, resumable video uploads, ordered playlist creation and reconciliation, and SRT caption uploads.
+- Added persistent per-course publishing state so interrupted or repeated commands resume without knowingly duplicating uploaded videos.
+- Added per-user YouTube Desktop OAuth discovery at `%LOCALAPPDATA%\Microvid\youtube_client_secret.json` and reusable token storage beside it.
 - Added automatic per-user credential loading from `%LOCALAPPDATA%\Microvid`.
 - Added `.env` loading for Gemini configuration without overriding explicit process variables.
 - Added automatic Google service-account discovery using `google_cloud_credentials.json`, or the only JSON file in the directory.

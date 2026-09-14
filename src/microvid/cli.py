@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -11,7 +12,7 @@ from .assets import write_text_assets
 from .auto_profile import write_scaffold_profile
 from .docx_parser import write_extraction
 from .global_planner import build_global_course_plan, extraction_signature, write_global_course_plan
-from .llm import provider_from_config
+from .llm import GeminiProvider, LLMError, provider_from_config
 from .llm_manifest_builder import build_all_manifests_with_llm
 from .manifest_builder import build_all_manifests
 from .media import audition_voices, build_windows_video, media_capabilities
@@ -20,6 +21,20 @@ from .qa import validate_workspace
 from .runtime_config import load_local_runtime_environment
 from .slides import build_pptx
 from .tts import TTSConfig
+from .youtube_publish import (
+    DEFAULT_TEMPLATE_PLAYLIST_ID,
+    YouTubePublishError,
+    authenticate_youtube,
+    create_course_cover,
+    fetch_template_playlist,
+    find_latest_workspace,
+    generate_youtube_metadata,
+    load_course_bundle,
+    load_metadata,
+    publish_course,
+    verify_channel,
+    write_metadata,
+)
 
 
 def _extraction_path(workspace: Path) -> Path:
@@ -267,6 +282,56 @@ def cmd_media_check(args) -> int:
     return 0
 
 
+def cmd_youtube_publish(args) -> int:
+    workspace = Path(args.workspace) if args.workspace else find_latest_workspace(args.workspace_root)
+    bundle = load_course_bundle(workspace)
+    print(f"Publishing course workspace -> {bundle.workspace}")
+
+    youtube = authenticate_youtube()
+    channel = verify_channel(youtube, args.expected_channel)
+    channel_name = channel.get("handle") or channel.get("title") or channel.get("id")
+    print(f"Authorized YouTube channel -> {channel_name}")
+
+    metadata_path = bundle.output_dir / "youtube_metadata.yaml"
+    if args.metadata:
+        metadata = load_metadata(args.metadata, bundle)
+    elif metadata_path.is_file() and not args.refresh_metadata:
+        metadata = load_metadata(metadata_path, bundle)
+        print(f"Reusing YouTube metadata -> {metadata_path}")
+    else:
+        template = fetch_template_playlist(youtube, args.template_playlist)
+        provider = GeminiProvider(
+            model=args.model or "gemini-flash-latest",
+            thinking_level=args.thinking_level or "high",
+        )
+        metadata = generate_youtube_metadata(bundle, template, provider)
+        metadata_path = write_metadata(bundle, metadata)
+        print(f"Generated template-informed YouTube metadata -> {metadata_path}")
+
+    cover_path = create_course_cover(metadata, bundle.output_dir / "course_cover.jpg")
+    print(f"Created square course image -> {cover_path}")
+    if args.dry_run:
+        print("Dry run complete; nothing was uploaded or created on YouTube.")
+        return 0
+
+    state = publish_course(
+        youtube,
+        bundle,
+        metadata,
+        cover_path,
+        template_playlist_id=args.template_playlist,
+        privacy=args.privacy,
+        category_id=args.category_id,
+        language=args.language,
+        made_for_kids=args.made_for_kids,
+        notify_subscribers=args.notify_subscribers,
+    )
+    print(f"Published {len(bundle.videos)} videos -> {state['playlist']['url']}")
+    print(f"Publishing state -> {bundle.output_dir / 'publish_state.json'}")
+    print("In YouTube Studio, use 'Set as course' on the new playlist if Courses is enabled.")
+    return 0
+
+
 def _add_llm_options(p: argparse.ArgumentParser) -> None:
     p.add_argument("--model", help="Override the profile's LLM model without editing Python.")
     p.add_argument(
@@ -406,6 +471,43 @@ def parser() -> argparse.ArgumentParser:
     av.add_argument("--voice", action="append", dest="voices", help="Voice to audition; repeat for multiple voices")
     _add_tts_options(av)
     av.set_defaults(func=cmd_tts_audition)
+
+    yt = sp.add_parser(
+        "youtube",
+        help="Prepare and publish a generated course to YouTube",
+    )
+    yt_sp = yt.add_subparsers(dest="youtube_command", required=True)
+    yp = yt_sp.add_parser(
+        "publish",
+        help="Upload every generated MP4, captions, playlist metadata and course image",
+    )
+    yp.add_argument(
+        "--workspace",
+        help="Completed course workspace. Defaults to the newest completed folder under --workspace-root.",
+    )
+    yp.add_argument("--workspace-root", default="workspace")
+    yp.add_argument("--template-playlist", default=DEFAULT_TEMPLATE_PLAYLIST_ID)
+    yp.add_argument("--metadata", help="Use an edited youtube_metadata.yaml instead of generating metadata")
+    yp.add_argument("--refresh-metadata", action="store_true")
+    yp.add_argument("--model", help="Gemini model used for YouTube metadata")
+    yp.add_argument("--thinking-level", choices=["low", "medium", "high"])
+    yp.add_argument(
+        "--privacy",
+        choices=["public", "unlisted", "private"],
+        default="public",
+        help="YouTube visibility. The publishing default is public.",
+    )
+    yp.add_argument("--category-id", default="27", help="YouTube category ID; 27 is Education")
+    yp.add_argument("--language", default="en-GB", help="BCP-47 metadata/caption language")
+    yp.add_argument(
+        "--expected-channel",
+        default=os.getenv("YOUTUBE_EXPECTED_CHANNEL_HANDLE"),
+        help="Optional safety check such as @tlyoon",
+    )
+    yp.add_argument("--made-for-kids", action="store_true")
+    yp.add_argument("--notify-subscribers", action="store_true")
+    yp.add_argument("--dry-run", action="store_true", help="Generate metadata/image without writing to YouTube")
+    yp.set_defaults(func=cmd_youtube_publish)
     return p
 
 
@@ -416,6 +518,9 @@ def main(argv: list[str] | None = None) -> int:
         return int(args.func(args))
     except KeyboardInterrupt:
         return 130
+    except (LLMError, YouTubePublishError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

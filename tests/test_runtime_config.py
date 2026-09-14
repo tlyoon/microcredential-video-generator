@@ -72,3 +72,16 @@ def test_relative_google_credentials_path_in_dotenv_is_relative_to_config_dir(tm
 
     assert result.google_credentials_file == credentials.resolve()
     assert environ["GOOGLE_APPLICATION_CREDENTIALS"] == str(credentials.resolve())
+
+
+def test_youtube_json_files_are_not_mistaken_for_tts_credentials(tmp_path):
+    config_dir = tmp_path / "Microvid"
+    config_dir.mkdir()
+    (config_dir / "youtube_client_secret.json").write_text("{}", encoding="utf-8")
+    (config_dir / "youtube_token.json").write_text("{}", encoding="utf-8")
+    environ = {}
+
+    result = load_local_runtime_environment(environ, config_dir=config_dir)
+
+    assert result.google_credentials_file is None
+    assert "GOOGLE_APPLICATION_CREDENTIALS" not in environ
