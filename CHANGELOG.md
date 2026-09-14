@@ -2,6 +2,13 @@
 
 All notable project changes are summarized here.
 
+## Unreleased
+
+- Added automatic per-user credential loading from `%LOCALAPPDATA%\Microvid`.
+- Added `.env` loading for Gemini configuration without overriding explicit process variables.
+- Added automatic Google service-account discovery using `google_cloud_credentials.json`, or the only JSON file in the directory.
+- Added `MICROVID_CONFIG_DIR` as an optional location override and documented credential precedence.
+
 ## 0.7.0 — Dedicated Gemini narration polishing
 
 - Promoted narration to a first-class production artifact rather than accepting the script directly from the general slide-generation/review pass.

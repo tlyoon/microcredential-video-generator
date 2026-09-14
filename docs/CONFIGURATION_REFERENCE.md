@@ -341,13 +341,40 @@ tts_text: >
 
 ## 13. Credentials
 
-Gemini:
+The CLI automatically checks the following per-user Windows directory:
+
+```text
+%LOCALAPPDATA%\Microvid
+```
+
+Place a `.env` file there containing:
+
+```dotenv
+GEMINI_API_KEY=...
+```
+
+Place the Google Cloud service-account credentials at:
+
+```text
+%LOCALAPPDATA%\Microvid\google_cloud_credentials.json
+```
+
+The preferred JSON filename is used when present. Otherwise, the package uses the only `*.json` file in the directory and refuses to guess when several are present. A relative `GOOGLE_APPLICATION_CREDENTIALS` path loaded from `.env` is resolved relative to this directory.
+
+Configuration precedence is:
+
+1. an existing process environment variable;
+2. a value loaded from `%LOCALAPPDATA%\Microvid\.env`;
+3. automatic Google credential-file discovery.
+
+`MICROVID_CONFIG_DIR` may override the per-user directory. Existing environment-based configuration remains supported:
 
 ```powershell
 $env:GEMINI_API_KEY = "..."
+$env:GOOGLE_APPLICATION_CREDENTIALS = "C:\secure\google-credentials.json"
 ```
 
-Google Cloud Chirp normally uses Application Default Credentials:
+Google Cloud CLI-managed Application Default Credentials remain available as an alternative:
 
 ```powershell
 gcloud auth application-default login

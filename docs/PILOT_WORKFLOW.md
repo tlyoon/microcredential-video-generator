@@ -13,17 +13,19 @@ git pull --ff-only
 pip install -e ".[dev,windows]"
 ```
 
-Set Gemini credentials:
+For automatic local credentials, create `%LOCALAPPDATA%\Microvid\.env` containing:
 
-```powershell
-$env:GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
+```dotenv
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
-Configure Google Cloud Application Default Credentials for Chirp:
+Place the authorized Google service-account file at:
 
-```powershell
-gcloud auth application-default login
+```text
+%LOCALAPPDATA%\Microvid\google_cloud_credentials.json
 ```
+
+The CLI loads both automatically. Explicit environment variables and Google Cloud CLI-managed Application Default Credentials remain supported alternatives.
 
 Check media dependencies:
 
