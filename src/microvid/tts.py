@@ -1,12 +1,32 @@
 from __future__ import annotations
 
 import os
+import time
 import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from .runtime_config import load_local_runtime_environment
+
+
+def _is_transient_tts_error(exc: Exception) -> bool:
+    code = getattr(exc, "code", None)
+    if callable(code):
+        code = code()
+    code_text = str(code).upper()
+    if code in {408, 429, 500, 502, 503, 504} or any(
+        marker in code_text
+        for marker in ("DEADLINE_EXCEEDED", "INTERNAL", "RESOURCE_EXHAUSTED", "UNAVAILABLE")
+    ):
+        return True
+    return type(exc).__name__ in {
+        "DeadlineExceeded",
+        "InternalServerError",
+        "RetryError",
+        "ServiceUnavailable",
+        "TooManyRequests",
+    }
 
 
 @dataclass(frozen=True)
@@ -27,14 +47,14 @@ class TTSConfig:
     )
 
     @classmethod
-    def from_mapping(cls, data: dict[str, Any] | None) -> "TTSConfig":
+    def from_mapping(cls, data: dict[str, Any] | None) -> TTSConfig:
         data = dict(data or {})
         voices = data.get("audition_voices")
         if voices is not None:
             data["audition_voices"] = tuple(str(v) for v in voices)
         return cls(**{k: v for k, v in data.items() if k in cls.__dataclass_fields__})
 
-    def with_overrides(self, **overrides: Any) -> "TTSConfig":
+    def with_overrides(self, **overrides: Any) -> TTSConfig:
         return replace(self, **{k: v for k, v in overrides.items() if v is not None})
 
     @property
@@ -90,23 +110,37 @@ class GoogleCloudChirp3TTSProvider:
             raise RuntimeError("Install google-cloud-texttospeech to use Chirp 3 HD.") from exc
         location = (self.config.location or "global").strip().lower()
         options = None if location in {"", "global"} else {"api_endpoint": f"{location}-texttospeech.googleapis.com"}
-        client = texttospeech.TextToSpeechClient(client_options=options) if options else texttospeech.TextToSpeechClient()
         encoding_name = self.config.audio_encoding.upper()
         try:
             encoding = getattr(texttospeech.AudioEncoding, encoding_name)
         except AttributeError as exc:
             raise ValueError(f"Unsupported Google Cloud TTS audio encoding: {encoding_name}") from exc
-        response = client.synthesize_speech(
-            input=texttospeech.SynthesisInput(text=text),
-            voice=texttospeech.VoiceSelectionParams(
-                language_code=self.config.language_code,
-                name=self.config.voice_name,
-            ),
-            audio_config=texttospeech.AudioConfig(
-                audio_encoding=encoding,
-                speaking_rate=float(self.config.speaking_rate),
-            ),
-        )
+        response = None
+        for attempt in range(4):
+            try:
+                client = (
+                    texttospeech.TextToSpeechClient(client_options=options)
+                    if options
+                    else texttospeech.TextToSpeechClient()
+                )
+                response = client.synthesize_speech(
+                    input=texttospeech.SynthesisInput(text=text),
+                    voice=texttospeech.VoiceSelectionParams(
+                        language_code=self.config.language_code,
+                        name=self.config.voice_name,
+                    ),
+                    audio_config=texttospeech.AudioConfig(
+                        audio_encoding=encoding,
+                        speaking_rate=float(self.config.speaking_rate),
+                    ),
+                )
+                break
+            except Exception as exc:
+                if attempt == 3 or not _is_transient_tts_error(exc):
+                    raise
+                time.sleep(2**attempt)
+        if response is None:  # pragma: no cover - defensive; loop either returns or raises
+            raise RuntimeError("Google Cloud TTS returned no response.")
         output_path = output_path.with_suffix(self.config.output_suffix)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         output_path.write_bytes(response.audio_content)

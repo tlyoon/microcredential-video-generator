@@ -8,6 +8,9 @@ All notable project changes are summarized here.
 - Added `.env` loading for Gemini configuration without overriding explicit process variables.
 - Added automatic Google service-account discovery using `google_cloud_credentials.json`, or the only JSON file in the directory.
 - Added `MICROVID_CONFIG_DIR` as an optional location override and documented credential precedence.
+- Updated Gemini structured generation to use streamed `generate_content` responses with bounded transient retries.
+- Adapted array-bound schema keywords that the live Gemini endpoint rejects while retaining local cardinality validation.
+- Added bounded retries for transient Google Cloud TTS connection, quota, timeout, and service errors.
 
 ## 0.7.0 — Dedicated Gemini narration polishing
 
