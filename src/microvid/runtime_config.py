@@ -10,6 +10,10 @@ APP_DIRECTORY_NAME = "Microvid"
 ENV_FILENAME = ".env"
 PREFERRED_GOOGLE_CREDENTIALS_FILENAME = "google_cloud_credentials.json"
 CONFIG_DIRECTORY_ENV = "MICROVID_CONFIG_DIR"
+NON_SERVICE_ACCOUNT_JSON_FILENAMES = {
+    "youtube_client_secret.json",
+    "youtube_token.json",
+}
 
 _ENV_KEY = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -66,7 +70,11 @@ def _discover_google_credentials(config_dir: Path) -> Path | None:
 
     # Accommodate the original filename supplied by Google when there is only
     # one JSON file. Do not guess when several JSON files are present.
-    candidates = sorted(path for path in config_dir.glob("*.json") if path.is_file())
+    candidates = sorted(
+        path
+        for path in config_dir.glob("*.json")
+        if path.is_file() and path.name.casefold() not in NON_SERVICE_ACCOUNT_JSON_FILENAMES
+    )
     if len(candidates) == 1:
         return candidates[0].resolve()
     return None
