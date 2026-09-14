@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import yaml
 from pptx import Presentation
-from pptx.util import Inches, Pt
 from pptx.enum.text import PP_ALIGN
+from pptx.util import Inches, Pt
+
+from .office_math import looks_like_math, set_native_math_paragraph, visible_math_to_latex
 
 
 def _add_footer(slide, slide_id: str, sources: list[str]) -> None:
@@ -37,15 +40,29 @@ def build_pptx(manifest_path: str | Path, output_path: str | Path) -> Path:
         btf.clear()
         for j, line in enumerate(item.get("onscreen", [])):
             p = btf.paragraphs[0] if j == 0 else btf.add_paragraph()
-            p.text = str(line)
-            p.font.size = Pt(24 if item.get("slide_type") != "check" else 28)
+            line = str(line)
+            font_size = 24 if item.get("slide_type") != "check" else 28
+            if looks_like_math(line):
+                set_native_math_paragraph(
+                    p,
+                    visible_math_to_latex(line),
+                    font_size_pt=font_size,
+                    alignment="left",
+                )
+            else:
+                p.text = line
+                p.font.size = Pt(font_size)
             p.space_after = Pt(15)
 
         equation = item.get("equation_latex")
         if equation:
             p = btf.add_paragraph()
-            p.text = f"Equation (LaTeX source): {equation}"
-            p.font.size = Pt(18)
+            set_native_math_paragraph(
+                p,
+                str(equation),
+                font_size_pt=22,
+                alignment="centerGroup",
+            )
 
         _add_footer(slide, item["id"], item.get("source_sections", []))
 
