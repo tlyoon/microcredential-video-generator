@@ -373,7 +373,7 @@ def _add_tts_options(p: argparse.ArgumentParser) -> None:
         choices=["google_cloud_chirp3", "sapi"],
         help="Override configured TTS provider",
     )
-    p.add_argument("--voice-name", help="Override Google Cloud voice, e.g. en-GB-Chirp3-HD-Leda")
+    p.add_argument("--voice-name", help="Override Google Cloud voice, e.g. en-US-Chirp-HD-F")
     p.add_argument("--language-code", help="Override TTS locale, e.g. en-GB")
     p.add_argument("--speaking-rate", type=float, help="Override TTS speaking rate")
     p.add_argument("--tts-location", help="Google Cloud TTS location, e.g. global or asia-southeast1")
