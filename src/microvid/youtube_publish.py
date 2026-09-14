@@ -615,6 +615,60 @@ def _arrange_playlist_items(
     return updates
 
 
+def _verify_playlist_prefix(
+    youtube,
+    playlist_id: str,
+    ordered_video_ids: list[str],
+) -> None:
+    """Require every replacement to be live and correctly ordered before cleanup."""
+    actual = [item["video_id"] for item in _list_playlist_items(youtube, playlist_id)]
+    if actual[: len(ordered_video_ids)] != ordered_video_ids:
+        raise YouTubePublishError(
+            "Replacement videos are not yet verified at the start of the playlist. "
+            "The old playlist entries were preserved; rerun the command to reconcile."
+        )
+
+
+def _remove_video_from_playlist(youtube, playlist_id: str, video_id: str) -> int:
+    matches = [
+        item for item in _list_playlist_items(youtube, playlist_id) if item["video_id"] == video_id
+    ]
+    for item in matches:
+        youtube.playlistItems().delete(id=item["id"]).execute(num_retries=5)
+    return len(matches)
+
+
+def _retire_video(youtube, video_id: str, policy: str) -> None:
+    if policy == "keep":
+        return
+    if policy == "delete":
+        existing = youtube.videos().list(part="id", id=video_id).execute(num_retries=5)
+        if not existing.get("items"):
+            return
+        youtube.videos().delete(id=video_id).execute(num_retries=5)
+        return
+    response = youtube.videos().list(part="status", id=video_id).execute(num_retries=5)
+    items = response.get("items", [])
+    if not items:
+        raise YouTubePublishError(f"Cannot change visibility; old video was not found: {video_id}")
+    current = items[0].get("status", {})
+    mutable_fields = {
+        "privacyStatus",
+        "publishAt",
+        "license",
+        "embeddable",
+        "publicStatsViewable",
+        "selfDeclaredMadeForKids",
+    }
+    status = {key: value for key, value in current.items() if key in mutable_fields}
+    status["privacyStatus"] = policy
+    status.pop("publishAt", None)
+    youtube.videos().update(
+        part="status",
+        body={"id": video_id, "status": status},
+    ).execute(num_retries=5)
+
+
 def _upload_caption(youtube, video_id: str, subtitle_path: Path, language: str) -> str:
     from googleapiclient.http import MediaFileUpload
 
@@ -656,6 +710,9 @@ def publish_course(
     language: str = "en-GB",
     made_for_kids: bool = False,
     notify_subscribers: bool = False,
+    replace_changed_videos: bool = False,
+    confirm_playlist_id: str | None = None,
+    retire_replaced_videos: str = "keep",
 ) -> dict[str, Any]:
     """Publish or resume a complete course. State is saved after every remote write."""
     output_dir = bundle.output_dir
@@ -677,6 +734,29 @@ def publish_course(
         _write_json(state_path, state)
     playlist_id = str(playlist["id"])
 
+    if retire_replaced_videos not in {"keep", "unlisted", "private", "delete"}:
+        raise YouTubePublishError(
+            "retire_replaced_videos must be keep, unlisted, private, or delete."
+        )
+
+    replacements: list[tuple[CourseVideo, dict[str, Any], str]] = []
+    for video in bundle.videos:
+        record = state["videos"].get(video.lesson_id, {})
+        fingerprint = _file_fingerprint(video.path)
+        if record.get("fingerprint") and record["fingerprint"] != fingerprint:
+            replacements.append((video, record, fingerprint))
+    if replacements and not replace_changed_videos:
+        names = ", ".join(video.path.name for video, _, _ in replacements)
+        raise YouTubePublishError(
+            f"Changed uploaded files detected ({names}). Rerun with "
+            "--replace-changed-videos and --confirm-playlist-id to use controlled replacement."
+        )
+    if replacements and confirm_playlist_id != playlist_id:
+        raise YouTubePublishError(
+            "Controlled replacement requires --confirm-playlist-id to exactly match "
+            f"the existing destination playlist ({playlist_id})."
+        )
+
     options = {
         "privacy": privacy,
         "category_id": category_id,
@@ -688,12 +768,53 @@ def publish_course(
     for position, video in enumerate(bundle.videos):
         record = state["videos"].setdefault(video.lesson_id, {})
         fingerprint = _file_fingerprint(video.path)
-        if record.get("fingerprint") and record["fingerprint"] != fingerprint:
-            raise YouTubePublishError(
-                f"{video.path.name} changed after it was uploaded. Refusing to create a duplicate."
-            )
+        changed = bool(record.get("fingerprint") and record["fingerprint"] != fingerprint)
+        if changed:
+            replacement = record.get("replacement")
+            if replacement and replacement.get("target_fingerprint") != fingerprint:
+                raise YouTubePublishError(
+                    f"{video.path.name} changed again during an unfinished replacement. "
+                    "Restore the expected file or resolve publish_state.json manually."
+                )
+            if not replacement:
+                replacement = {
+                    "target_fingerprint": fingerprint,
+                    "old_youtube_video_id": record.get("youtube_video_id"),
+                    "old_playlist_item_id": record.get("playlist_item_id"),
+                    "old_caption_id": record.get("caption_id"),
+                    "old_fingerprint": record.get("fingerprint"),
+                }
+                record["replacement"] = replacement
+                state["complete"] = False
+                _write_json(state_path, state)
+            if not replacement.get("new_youtube_video_id"):
+                print(f"Uploading replacement for {video.lesson_id}: {video.path.name}...")
+                replacement["new_youtube_video_id"] = _upload_video(
+                    youtube, video, video_metadata[video.lesson_id], options
+                )
+                replacement["new_url"] = (
+                    f"https://youtu.be/{replacement['new_youtube_video_id']}"
+                )
+                _write_json(state_path, state)
+            if not replacement.get("new_playlist_item_id"):
+                replacement["new_playlist_item_id"] = _add_to_playlist(
+                    youtube,
+                    playlist_id,
+                    replacement["new_youtube_video_id"],
+                    position,
+                )
+                _write_json(state_path, state)
+            if video.subtitle_path and not replacement.get("new_caption_id"):
+                replacement["new_caption_id"] = _upload_caption(
+                    youtube,
+                    replacement["new_youtube_video_id"],
+                    video.subtitle_path,
+                    language,
+                )
+                _write_json(state_path, state)
+            continue
         if not record.get("youtube_video_id"):
-            print(f"Uploading {video.path.name} as public video {video.lesson_id}...")
+            print(f"Uploading {video.path.name} as {privacy} video {video.lesson_id}...")
             record["youtube_video_id"] = _upload_video(
                 youtube, video, video_metadata[video.lesson_id], options
             )
@@ -710,15 +831,53 @@ def publish_course(
                 youtube, record["youtube_video_id"], video.subtitle_path, language
             )
             _write_json(state_path, state)
-    ordered_video_ids = [
-        str(state["videos"][video.lesson_id]["youtube_video_id"])
-        for video in bundle.videos
-    ]
+    ordered_video_ids = []
+    for video in bundle.videos:
+        record = state["videos"][video.lesson_id]
+        replacement = record.get("replacement") or {}
+        ordered_video_ids.append(
+            str(replacement.get("new_youtube_video_id") or record["youtube_video_id"])
+        )
     reordered = _arrange_playlist_items(youtube, playlist_id, ordered_video_ids)
     if reordered:
         print(f"Reordered {reordered} playlist items into lesson sequence.")
     else:
         print("Verified playlist lesson sequence.")
+    if replacements:
+        _verify_playlist_prefix(youtube, playlist_id, ordered_video_ids)
+        for video, record, fingerprint in replacements:
+            replacement = record["replacement"]
+            old_video_id = str(replacement["old_youtube_video_id"])
+            if not replacement.get("old_playlist_removed"):
+                removed = _remove_video_from_playlist(youtube, playlist_id, old_video_id)
+                replacement["old_playlist_removed"] = True
+                replacement["removed_playlist_items"] = removed
+                _write_json(state_path, state)
+            if not replacement.get("old_video_retired"):
+                _retire_video(youtube, old_video_id, retire_replaced_videos)
+                replacement["old_video_retired"] = True
+                replacement["retirement_policy"] = retire_replaced_videos
+                _write_json(state_path, state)
+
+            history = record.setdefault("replacement_history", [])
+            history.append(
+                {
+                    "youtube_video_id": old_video_id,
+                    "url": record.get("url"),
+                    "fingerprint": replacement.get("old_fingerprint"),
+                    "playlist_item_id": replacement.get("old_playlist_item_id"),
+                    "caption_id": replacement.get("old_caption_id"),
+                    "retirement_policy": retire_replaced_videos,
+                }
+            )
+            record["youtube_video_id"] = replacement["new_youtube_video_id"]
+            record["url"] = replacement["new_url"]
+            record["playlist_item_id"] = replacement["new_playlist_item_id"]
+            record["caption_id"] = replacement.get("new_caption_id")
+            record["fingerprint"] = fingerprint
+            del record["replacement"]
+            _write_json(state_path, state)
+        print(f"Replaced {len(replacements)} changed course videos safely.")
     if not playlist.get("image_id"):
         playlist["image_id"] = _upload_playlist_image(youtube, playlist_id, cover_path)
         _write_json(state_path, state)

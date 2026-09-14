@@ -325,6 +325,9 @@ def cmd_youtube_publish(args) -> int:
         language=args.language,
         made_for_kids=args.made_for_kids,
         notify_subscribers=args.notify_subscribers,
+        replace_changed_videos=args.replace_changed_videos,
+        confirm_playlist_id=args.confirm_playlist_id,
+        retire_replaced_videos=args.retire_replaced_videos,
     )
     print(f"Published {len(bundle.videos)} videos -> {state['playlist']['url']}")
     print(f"Publishing state -> {bundle.output_dir / 'publish_state.json'}")
@@ -506,6 +509,21 @@ def parser() -> argparse.ArgumentParser:
     )
     yp.add_argument("--made-for-kids", action="store_true")
     yp.add_argument("--notify-subscribers", action="store_true")
+    yp.add_argument(
+        "--replace-changed-videos",
+        action="store_true",
+        help="Upload changed MP4s, verify their order, then remove superseded playlist entries",
+    )
+    yp.add_argument(
+        "--confirm-playlist-id",
+        help="Required exact destination playlist ID when replacing changed videos",
+    )
+    yp.add_argument(
+        "--retire-replaced-videos",
+        choices=["keep", "unlisted", "private", "delete"],
+        default="keep",
+        help="What to do with superseded videos after playlist replacement (default: keep)",
+    )
     yp.add_argument("--dry-run", action="store_true", help="Generate metadata/image without writing to YouTube")
     yp.set_defaults(func=cmd_youtube_publish)
     return p
