@@ -105,6 +105,31 @@ playlist entries, captions, and the playlist image are skipped. If a local MP4 c
 upload, the publisher stops rather than creating a silent duplicate. The completed state file
 contains the playlist URL and each uploaded video URL.
 
+### Controlled replacement of regenerated videos
+
+YouTube cannot replace the media bytes behind an existing video ID. When previously
+published MP4 files change, use the guarded replacement mode and confirm the exact
+destination playlist ID:
+
+```powershell
+.\.venv\Scripts\python.exe -m microvid.cli youtube publish `
+  --workspace ".\workspace\lab101" `
+  --expected-channel "@tlyoon" `
+  --replace-changed-videos `
+  --confirm-playlist-id "YOUR_EXISTING_PLAYLIST_ID"
+```
+
+For every changed lesson, the publisher uploads the new video and caption, inserts the
+new playlist item, reconciles the complete V01-to-VNN order, and verifies that the new
+videos occupy the beginning of the playlist. Only after that verification succeeds does
+it remove the superseded playlist entries. Progress is written after every remote change,
+so an interrupted replacement resumes without intentionally uploading another copy.
+
+The old videos remain on the channel by default. Use
+`--retire-replaced-videos unlisted`, `private`, or `delete` to change that behavior.
+Deletion is irreversible; `keep` is the default and safest policy. Old IDs, fingerprints,
+and the chosen policy are retained in each lesson's `replacement_history` record.
+
 Every normal publish or resume also reads the live playlist and reconciles the course videos
 to lesson order (`V01`, `V02`, `V03`, and so on). Only misplaced items are moved, and course
 videos are kept together at the start of the playlist. This final pass protects the sequence
@@ -136,5 +161,8 @@ already usable if that option is unavailable.
 --language en-GB             Metadata and caption language
 --made-for-kids              Declare the videos as made for children
 --notify-subscribers         Request upload notifications
+--replace-changed-videos     Safely swap changed MP4s into the existing playlist
+--confirm-playlist-id ID     Required exact playlist confirmation for replacement
+--retire-replaced-videos P   keep (default), unlisted, private, or delete
 --dry-run                    Prepare local publishing assets only
 ```

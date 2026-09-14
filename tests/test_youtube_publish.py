@@ -86,6 +86,8 @@ def test_youtube_cli_defaults_to_public_uploads():
 
     assert args.privacy == "public"
     assert args.template_playlist == publishing.DEFAULT_TEMPLATE_PLAYLIST_ID
+    assert args.replace_changed_videos is False
+    assert args.retire_replaced_videos == "keep"
 
 
 def test_normalize_metadata_requires_exact_lesson_ids(tmp_path):
@@ -247,3 +249,91 @@ def test_publish_state_makes_rerun_idempotent(tmp_path, monkeypatch):
     assert youtube.playlists_api.inserts == 1
     saved = json.loads((bundle.output_dir / "publish_state.json").read_text())
     assert saved["privacy"] == "public"
+
+
+def test_controlled_replacement_verifies_new_playlist_before_removing_old(tmp_path, monkeypatch):
+    bundle = load_course_bundle(_workspace(tmp_path))
+    metadata = _metadata(bundle)
+    cover = create_course_cover(metadata, bundle.output_dir / "course_cover.jpg")
+    youtube = _YouTube()
+    calls = {"video": 0, "item": 0, "caption": 0, "verify": 0}
+    removed: list[str] = []
+    retired: list[tuple[str, str]] = []
+    safety_events: list[str] = []
+
+    def upload_video(*_args, **_kwargs):
+        calls["video"] += 1
+        return f"youtube-{calls['video']}"
+
+    def add_item(*_args, **_kwargs):
+        calls["item"] += 1
+        return f"item-{calls['item']}"
+
+    def upload_caption(*_args, **_kwargs):
+        calls["caption"] += 1
+        return f"caption-{calls['caption']}"
+
+    def verify(*_args, **_kwargs):
+        calls["verify"] += 1
+        safety_events.append("verified")
+
+    def remove(_youtube, _playlist_id, video_id):
+        safety_events.append(f"removed:{video_id}")
+        removed.append(video_id)
+        return 1
+
+    def retire(_youtube, video_id, policy):
+        retired.append((video_id, policy))
+
+    monkeypatch.setattr(publishing, "_upload_video", upload_video)
+    monkeypatch.setattr(publishing, "_add_to_playlist", add_item)
+    monkeypatch.setattr(publishing, "_upload_caption", upload_caption)
+    monkeypatch.setattr(publishing, "_upload_playlist_image", lambda *_args: "image-1")
+    monkeypatch.setattr(publishing, "_arrange_playlist_items", lambda *_args: 0)
+    monkeypatch.setattr(publishing, "_verify_playlist_prefix", verify)
+    monkeypatch.setattr(publishing, "_remove_video_from_playlist", remove)
+    monkeypatch.setattr(publishing, "_retire_video", retire)
+
+    kwargs = {"template_playlist_id": "PL-template", "privacy": "public"}
+    publish_course(youtube, bundle, metadata, cover, **kwargs)
+    for video in bundle.videos:
+        video.path.write_bytes(video.path.read_bytes() + b"-corrected")
+
+    with pytest.raises(YouTubePublishError, match="--replace-changed-videos"):
+        publish_course(youtube, bundle, metadata, cover, **kwargs)
+    with pytest.raises(YouTubePublishError, match="--confirm-playlist-id"):
+        publish_course(
+            youtube,
+            bundle,
+            metadata,
+            cover,
+            **kwargs,
+            replace_changed_videos=True,
+            confirm_playlist_id="wrong-playlist",
+        )
+
+    state = publish_course(
+        youtube,
+        bundle,
+        metadata,
+        cover,
+        **kwargs,
+        replace_changed_videos=True,
+        confirm_playlist_id="PL-new",
+        retire_replaced_videos="keep",
+    )
+
+    assert calls == {"video": 6, "item": 6, "caption": 6, "verify": 1}
+    assert safety_events[0] == "verified"
+    assert removed == ["youtube-1", "youtube-2", "youtube-3"]
+    assert retired == [
+        ("youtube-1", "keep"),
+        ("youtube-2", "keep"),
+        ("youtube-3", "keep"),
+    ]
+    for number in (1, 2, 3):
+        record = state["videos"][f"V{number:02d}"]
+        assert record["youtube_video_id"] == f"youtube-{number + 3}"
+        assert record["replacement_history"][0]["youtube_video_id"] == f"youtube-{number}"
+        assert "replacement" not in record
+    assert state["complete"] is True
