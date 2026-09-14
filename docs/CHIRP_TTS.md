@@ -21,13 +21,21 @@ The default voice is configuration data, not hard-coded in the renderer. A diffe
 
 ## Authentication
 
-Install/update the Python package, enable Cloud Text-to-Speech in the Google Cloud project used for production, and configure Application Default Credentials on the workstation. A common local setup is:
+Install/update the Python package and enable Cloud Text-to-Speech in the Google Cloud project used for production. For automatic local service-account authentication, place the authorized file at:
+
+```text
+%LOCALAPPDATA%\Microvid\google_cloud_credentials.json
+```
+
+The package sets `GOOGLE_APPLICATION_CREDENTIALS` automatically. If that preferred filename is absent, it uses the only `*.json` file in the directory. Explicit environment configuration takes precedence.
+
+Google Cloud CLI-managed Application Default Credentials remain an alternative:
 
 ```powershell
 gcloud auth application-default login
 ```
 
-A managed workstation may alternatively set `GOOGLE_APPLICATION_CREDENTIALS` to an authorized service-account file.
+A managed workstation may alternatively set `GOOGLE_APPLICATION_CREDENTIALS` explicitly.
 
 Never commit Google credentials, API keys, OAuth tokens, or service-account JSON files to Git.
 

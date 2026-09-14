@@ -206,7 +206,21 @@ python -m pytest
 
 ## 7. Configure Gemini
 
-Set the API key in the current PowerShell session:
+The recommended one-time Windows setup is to create:
+
+```text
+%LOCALAPPDATA%\Microvid\.env
+```
+
+containing:
+
+```dotenv
+GEMINI_API_KEY=YOUR_GEMINI_API_KEY
+```
+
+Every `microvid` command loads this file automatically. Existing process environment variables take precedence, so CI systems and temporary overrides continue to work. For a nonstandard location, set `MICROVID_CONFIG_DIR` to the directory containing `.env`.
+
+Setting the API key for only the current PowerShell session is also supported:
 
 ```powershell
 $env:GEMINI_API_KEY = "YOUR_GEMINI_API_KEY"
@@ -246,7 +260,15 @@ For reproducible production runs, pin an exact supported model instead of a movi
 
 ## 8. Configure Chirp TTS
 
-Authenticate Google Cloud locally:
+For the simplest service-account setup, copy the authorized JSON file to:
+
+```text
+%LOCALAPPDATA%\Microvid\google_cloud_credentials.json
+```
+
+The package automatically sets `GOOGLE_APPLICATION_CREDENTIALS` before creating the Google Cloud TTS client. If the preferred filename is absent, it uses the only `*.json` file in that directory. It will not guess when several differently named JSON files are present. An existing `GOOGLE_APPLICATION_CREDENTIALS` value always takes precedence.
+
+Application Default Credentials through the Google Cloud CLI remain supported as an alternative:
 
 ```powershell
 gcloud auth application-default login
@@ -681,7 +703,7 @@ pip install -e ".[dev,windows]"
 $env:GEMINI_API_KEY
 ```
 
-Confirm the key is set and the configured model is available.
+If it is empty, confirm `%LOCALAPPDATA%\Microvid\.env` exists and contains `GEMINI_API_KEY=...`. Also confirm the configured model is available.
 
 ### Narration polish fails with a speech-hygiene error
 
@@ -701,9 +723,7 @@ Inspect `global_consistency_initial.yaml` and `global_consistency_final.yaml`. R
 
 ### Chirp authentication fails
 
-```powershell
-gcloud auth application-default login
-```
+Confirm `%LOCALAPPDATA%\Microvid\google_cloud_credentials.json` exists, or that the directory contains exactly one JSON credential file. An explicit `GOOGLE_APPLICATION_CREDENTIALS` setting or `gcloud auth application-default login` may be used instead.
 
 Also confirm Cloud Text-to-Speech is enabled and the project has suitable permissions/billing.
 

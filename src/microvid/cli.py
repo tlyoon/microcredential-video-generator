@@ -2,20 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
+
 import yaml
 
 from .assets import write_text_assets
 from .auto_profile import write_scaffold_profile
 from .docx_parser import write_extraction
 from .global_planner import build_global_course_plan, extraction_signature, write_global_course_plan
-from .manifest_builder import build_all_manifests
 from .llm import provider_from_config
 from .llm_manifest_builder import build_all_manifests_with_llm
+from .manifest_builder import build_all_manifests
 from .media import audition_voices, build_windows_video, media_capabilities
 from .profile import load_profile
 from .qa import validate_workspace
+from .runtime_config import load_local_runtime_environment
 from .slides import build_pptx
 from .tts import TTSConfig
 
@@ -408,6 +410,7 @@ def parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    load_local_runtime_environment()
     args = parser().parse_args(argv)
     try:
         return int(args.func(args))

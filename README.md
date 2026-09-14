@@ -157,7 +157,19 @@ course:
 
 The narration polish is enabled by default even for older profiles that omit the field. Set `narration_polish_pass: false` only for deliberate cost/diagnostic comparisons.
 
-Set the key locally:
+For a zero-repeat local setup on Windows, create:
+
+```text
+%LOCALAPPDATA%\Microvid\.env
+```
+
+with:
+
+```dotenv
+GEMINI_API_KEY=your-key
+```
+
+The CLI loads this file automatically without overriding an environment variable that is already set. The directory can be overridden with `MICROVID_CONFIG_DIR`. Setting the key for only the current shell remains supported:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
@@ -191,6 +203,14 @@ microvid tts-audition `
 ```
 
 Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`.
+
+For automatic Google Cloud authentication, place the service-account file at:
+
+```text
+%LOCALAPPDATA%\Microvid\google_cloud_credentials.json
+```
+
+If that preferred name is absent, the only `*.json` file in the directory is used. An explicitly configured `GOOGLE_APPLICATION_CREDENTIALS` environment variable always takes precedence. Keep the entire `%LOCALAPPDATA%\Microvid` directory private and never copy credentials into the repository.
 
 ## Editorial gates
 

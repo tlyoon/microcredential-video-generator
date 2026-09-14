@@ -5,6 +5,8 @@ import os
 from dataclasses import dataclass
 from typing import Any, Protocol
 
+from .runtime_config import load_local_runtime_environment
+
 
 class LLMError(RuntimeError):
     """Raised when an LLM provider cannot produce a usable response."""
@@ -31,6 +33,7 @@ class GeminiProvider:
     provider_name: str = "gemini"
 
     def _client(self):
+        load_local_runtime_environment()
         api_key = os.getenv(self.api_key_env)
         if not api_key:
             raise LLMError(

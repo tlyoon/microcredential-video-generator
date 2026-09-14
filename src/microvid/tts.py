@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import os
+import warnings
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Protocol
-import os
-import warnings
+
+from .runtime_config import load_local_runtime_environment
 
 
 @dataclass(frozen=True)
@@ -81,6 +83,7 @@ class GoogleCloudChirp3TTSProvider:
         self.config = config
 
     def synthesize(self, text: str, output_path: Path) -> SynthesisResult:
+        load_local_runtime_environment()
         try:
             from google.cloud import texttospeech  # type: ignore
         except ImportError as exc:
