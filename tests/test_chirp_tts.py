@@ -1,5 +1,10 @@
 from microvid.speech import normalize_scientific_speech
-from microvid.tts import FallbackTTSProvider, TTSConfig, provider_from_tts_config
+from microvid.tts import (
+    FallbackTTSProvider,
+    TTSConfig,
+    _is_transient_tts_error,
+    provider_from_tts_config,
+)
 
 
 def test_scientific_speech_normalization():
@@ -35,3 +40,11 @@ def test_mapping_and_overrides_are_soft_coded():
 def test_provider_wraps_chirp_with_sapi_fallback():
     provider = provider_from_tts_config(TTSConfig())
     assert isinstance(provider, FallbackTTSProvider)
+
+
+def test_transient_tts_errors_are_identified_without_retrying_auth_errors():
+    unavailable = type("ServiceUnavailable", (Exception,), {})()
+    forbidden = type("Forbidden", (Exception,), {"code": 403})()
+
+    assert _is_transient_tts_error(unavailable)
+    assert not _is_transient_tts_error(forbidden)

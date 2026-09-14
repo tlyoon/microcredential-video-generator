@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
 from typing import Any, Protocol
 
@@ -17,6 +18,39 @@ class JSONLLMProvider(Protocol):
     model: str
 
     def generate_json(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]: ...
+
+
+def _gemini_compatible_schema(value: Any) -> Any:
+    """Remove array bounds rejected by Gemini's structured-output endpoint.
+
+    The lesson builders still enforce their slide/video cardinality locally;
+    this only adapts the schema sent to the provider.
+    """
+    if isinstance(value, dict):
+        return {
+            key: _gemini_compatible_schema(item)
+            for key, item in value.items()
+            if key not in {"minItems", "maxItems"}
+        }
+    if isinstance(value, list):
+        return [_gemini_compatible_schema(item) for item in value]
+    return value
+
+
+def _is_transient_provider_error(exc: Exception) -> bool:
+    code = getattr(exc, "code", None)
+    if code in {408, 429, 500, 502, 503, 504}:
+        return True
+    return type(exc).__name__ in {
+        "ConnectError",
+        "ConnectTimeout",
+        "ReadError",
+        "ReadTimeout",
+        "RemoteProtocolError",
+        "ServerError",
+        "WriteError",
+        "WriteTimeout",
+    }
 
 
 @dataclass
@@ -43,31 +77,42 @@ class GeminiProvider:
             )
         try:
             from google import genai  # type: ignore
+            from google.genai import types  # type: ignore
         except ImportError as exc:
             raise LLMError(
                 "The google-genai package is required for Gemini generation. "
                 "Install the project dependencies before running the LLM pipeline."
             ) from exc
-        return genai.Client(api_key=api_key)
+        return genai.Client(api_key=api_key), types
 
     def generate_json(self, prompt: str, schema: dict[str, Any]) -> dict[str, Any]:
-        client = self._client()
-        try:
-            interaction = client.interactions.create(
-                model=self.model,
-                input=prompt,
-                generation_config={"thinking_level": self.thinking_level},
-                response_format={
-                    "type": "text",
-                    "mime_type": "application/json",
-                    "schema": schema,
-                },
-            )
-            text = interaction.output_text
-        except Exception as exc:
-            raise LLMError(
-                f"Gemini generation failed for model {self.model}: {exc}"
-            ) from exc
+        client, types = self._client()
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            response_json_schema=_gemini_compatible_schema(schema),
+            thinking_config=types.ThinkingConfig(
+                thinking_level=self.thinking_level.upper()
+            ),
+            automatic_function_calling=types.AutomaticFunctionCallingConfig(
+                disable=True
+            ),
+        )
+        text = ""
+        for attempt in range(3):
+            try:
+                chunks = client.models.generate_content_stream(
+                    model=self.model,
+                    contents=prompt,
+                    config=config,
+                )
+                text = "".join(chunk.text or "" for chunk in chunks)
+                break
+            except Exception as exc:
+                if attempt == 2 or not _is_transient_provider_error(exc):
+                    raise LLMError(
+                        f"Gemini generation failed for model {self.model}: {exc}"
+                    ) from exc
+                time.sleep(2**attempt)
 
         if not text:
             raise LLMError(f"Gemini model {self.model} returned an empty response.")
