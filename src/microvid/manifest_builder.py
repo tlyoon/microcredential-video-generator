@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
+
 import yaml
 
 from .models import SlideDraft
 from .segmenter import lesson_blocks
 from .text import clean_text, sentences, shorten, word_count
+
 
 def _content_blocks(blocks: Iterable[dict], course: dict) -> list[dict]:
     skip_headings = {str(x).casefold() for x in _selection_config(course).get("skip_headings", ["table of contents"])}

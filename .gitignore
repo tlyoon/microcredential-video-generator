@@ -11,6 +11,7 @@ dist/
 # Local runtime source documents. The tracked sample lives under examples/sample_docs/.
 source/*.docx
 source/*.pdf
+source/**/*.pdf
 !source/README.md
 
 # Generated artefacts

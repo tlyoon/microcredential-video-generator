@@ -113,7 +113,7 @@ def _merge_same_row(blocks: list[dict[str, Any]]) -> list[dict[str, Any]]:
     rows: list[list[dict[str, Any]]] = []
 
     for block in ordered:
-        x0, y0, x1, y1 = block["bbox"]
+        _, y0, _, y1 = block["bbox"]
         cy = (y0 + y1) / 2.0
         placed = False
         for row in reversed(rows[-4:]):
@@ -215,7 +215,7 @@ def _repeated_margin_texts(
                 if normalized:
                     seen.add(normalized)
         counts.update(seen)
-    threshold = max(min_pages, int(round(len(pages) * fraction)))
+    threshold = max(min_pages, round(len(pages) * fraction))
     return {text for text, count in counts.items() if count >= threshold}
 
 

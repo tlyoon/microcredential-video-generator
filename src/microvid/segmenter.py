@@ -56,17 +56,17 @@ def selector_matches(block: dict, selector: Any) -> bool:
         pattern = re.compile(str(selector["heading_regex"]), re.IGNORECASE)
         if not any(pattern.search(h) for h in path):
             return False
-    if "path_regex" in selector:
-        if not re.search(str(selector["path_regex"]), path_joined, flags=re.IGNORECASE):
-            return False
+    if "path_regex" in selector and not re.search(
+        str(selector["path_regex"]), path_joined, flags=re.IGNORECASE
+    ):
+        return False
     if "kind" in selector:
         kinds = selector["kind"] if isinstance(selector["kind"], list) else [selector["kind"]]
         if block.get("kind") not in {str(x) for x in kinds}:
             return False
-    if "text_regex" in selector:
-        if not re.search(str(selector["text_regex"]), block.get("text", ""), flags=re.IGNORECASE):
-            return False
-    return True
+    return "text_regex" not in selector or bool(
+        re.search(str(selector["text_regex"]), block.get("text", ""), flags=re.IGNORECASE)
+    )
 
 
 def any_selector_matches(block: dict, selectors: list[Any]) -> bool:

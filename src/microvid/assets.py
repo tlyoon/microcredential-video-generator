@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+
 import yaml
 
 
@@ -9,7 +10,7 @@ def _load(path: Path) -> dict:
 
 
 def seconds_to_srt(seconds: float) -> str:
-    ms = int(round(seconds * 1000))
+    ms = round(seconds * 1000)
     h, rem = divmod(ms, 3_600_000)
     m, rem = divmod(rem, 60_000)
     s, ms = divmod(rem, 1000)
