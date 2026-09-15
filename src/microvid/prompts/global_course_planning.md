@@ -45,3 +45,30 @@ For every planned video provide:
 Do not feel obliged to put administrative boilerplate, table-of-contents text, duplicated wording, or detailed reference checklists into a video. However, substantive concepts, assumptions, equations, worked examples, and limitations should not disappear merely because they do not align with a pre-existing section boundary. Use `coverage_notes` to explain intentionally omitted or reference-only material.
 
 Return only JSON conforming to the supplied schema.
+## Textbook-subchapter planning mode
+
+When `source_document.classification.kind` is `textbook_subchapter`, the local ingestion layer has
+already identified and scoped the dominant intended numbered subchapter. Treat the supplied blocks
+as the complete authoritative scope: do not infer, restore, or plan lessons from adjacent sections
+that were excluded during ingestion.
+
+For a short self-contained subchapter, prefer one coherent video unless conceptual density genuinely
+requires more than one. If multiple videos are pedagogically justified, each video must still be a
+complete micro-lesson. Reserve enough slide capacity for the mandatory textbook architecture:
+`title` -> `introduction` -> substantive concept development -> conceptual `check` -> `conclusion`.
+Therefore every planned textbook video must have `max_slides >= 5`.
+
+The check question should strengthen conceptual understanding rather than test trivial recall. The
+course plan should cover the substantive ideas, equations, examples, cautions, and interpretations
+of the scoped subchapter without importing unsupported material from general knowledge.
+
+## Textbook figure planning
+
+When the scoped source is a textbook subchapter and `source_document.available_figures` is non-empty, account for those supplied textbook visuals while planning the lesson sequence.
+
+- Treat the supplied figures as part of the authoritative source context, not decoration.
+- Plan concept development so a relevant figure can be used where it genuinely clarifies the physical idea, mechanism, comparison, or example.
+- Do not force a figure into every lesson or slide.
+- Do not request external images, substitute stock imagery, or invent a figure that is absent from the supplied source.
+- Preserve enough slide capacity for a figure-centered explanation when a figure is central to understanding.
+- Keep visual density low enough that a figure and the necessary explanatory text can be inspected comfortably at normal presentation size.

@@ -52,6 +52,7 @@ def _compact_manifest(manifest: dict) -> dict[str, Any]:
         "focus": manifest.get("focus"),
         "learning_outcomes": manifest.get("learning_outcomes", []),
         "target_minutes": manifest.get("target_minutes"),
+        "source_document_type": manifest.get("source_document_type"),
         "slides": [
             {
                 "id": slide.get("id"),
@@ -60,6 +61,8 @@ def _compact_manifest(manifest: dict) -> dict[str, Any]:
                 "onscreen": slide.get("onscreen", []),
                 "narration": slide.get("narration", ""),
                 "equation_latex": slide.get("equation_latex"),
+                "figure_ids": slide.get("figure_ids", []),
+                "figure_layout_hint": slide.get("figure_layout_hint", "auto"),
                 "source_block_ids": slide.get("source_block_ids", []),
                 "estimated_seconds": slide.get("estimated_seconds"),
             }

@@ -43,6 +43,8 @@ def narration_polish_schema(slide_ids: list[str]) -> dict[str, Any]:
 def _prompt_payload(context: dict[str, Any], manifest: dict) -> dict[str, Any]:
     return {
         "narration_wpm": context.get("course", {}).get("narration_wpm", 130),
+        "source_document": context.get("source_document"),
+        "available_figures": context.get("available_figures", []),
         "global_course_context": context.get("global_course_context"),
         "lesson": context.get("lesson"),
         "authoritative_core_blocks": context.get("authoritative_core_blocks", []),
@@ -61,6 +63,8 @@ def _prompt_payload(context: dict[str, Any], manifest: dict) -> dict[str, Any]:
                     "narration": slide.get("narration", ""),
                     "visual_direction": slide.get("visual_direction", ""),
                     "equation_latex": slide.get("equation_latex"),
+                    "figure_ids": slide.get("figure_ids", []),
+                    "figure_assets": slide.get("figure_assets", []),
                     "source_block_ids": slide.get("source_block_ids", []),
                     "estimated_seconds": slide.get("estimated_seconds", 30),
                 }
@@ -87,10 +91,18 @@ def narration_quality_findings(manifest: dict, narration_wpm: int = 130) -> list
     findings: list[dict[str, Any]] = []
     raw_math_patterns = [r"\\frac\b", r"\\begin\b", r"\\mathrm\b", r"```", r"\$[^$]+\$"]
     meta_patterns = [r"\bsource[_ ]block", r"\bjson schema\b", r"\binternal prompt\b"]
+    textbook = manifest.get("source_document_type") == "textbook_subchapter"
+    textbook_forbidden = [
+        r"\\[A-Za-z]+", r"\$", r"\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[^,.!?;]+",
+        r"[₀-₉]", r"[⁰¹²³⁴⁵⁶⁷⁸⁹]", r"[±×÷√∑Σ]", r"\[[^\]]*(?:source|citation|grounding|page)\b[^\]]*\]",
+        r"(?:cite|filecite|memcite)", r"\b(?:page|slide)\s+\d+(?:\s+of\s+\d+)?\b",
+    ]
 
     for slide in manifest.get("slides", []):
         slide_id = str(slide.get("id", ""))
         narration = str(slide.get("narration", "")).strip()
+        tts_text = str(slide.get("tts_text", "")).strip()
+        speech_variants = [narration] + ([tts_text] if tts_text else [])
         words = len(re.findall(r"\b[\w’'-]+\b", narration))
         seconds = max(1, int(slide.get("estimated_seconds", 30)))
         theoretical_capacity = seconds * max(1, narration_wpm) / 60.0
@@ -98,35 +110,41 @@ def narration_quality_findings(manifest: dict, narration_wpm: int = 130) -> list
         slide["narration_word_count"] = words
         slide["narration_estimated_spoken_seconds"] = round(words * 60 / max(1, narration_wpm), 1)
 
-        if any(re.search(pattern, narration, flags=re.IGNORECASE) for pattern in raw_math_patterns):
-            findings.append(
-                {
-                    "severity": "error",
-                    "slide": slide_id,
-                    "message": "Narration contains raw markup/LaTeX unsuitable for polished TTS speech.",
-                }
+        if any(re.search(pattern, text, flags=re.IGNORECASE) for text in speech_variants for pattern in raw_math_patterns):
+            findings.append({
+                "severity": "error", "slide": slide_id,
+                "message": "Narration contains raw markup/LaTeX unsuitable for polished TTS speech.",
+            })
+        if any(re.search(pattern, text, flags=re.IGNORECASE) for text in speech_variants for pattern in meta_patterns):
+            findings.append({
+                "severity": "error", "slide": slide_id,
+                "message": "Narration exposes internal production/provenance language.",
+            })
+        if textbook and any(
+            re.search(pattern, text, flags=re.IGNORECASE)
+            for text in speech_variants for pattern in textbook_forbidden
+        ):
+            findings.append({
+                "severity": "error", "slide": slide_id,
+                "message": "Textbook narration contains forbidden symbolic math, counters, or source artefacts; rewrite it as plain spoken English.",
+            })
+        if textbook and slide.get("figure_ids"):
+            figure_language = re.search(
+                r"\b(?:figure|diagram|image|illustration|photograph|photo|graph|plot|shows?|depicts?|illustrates?)\b",
+                narration,
+                flags=re.IGNORECASE,
             )
-        if any(re.search(pattern, narration, flags=re.IGNORECASE) for pattern in meta_patterns):
-            findings.append(
-                {
-                    "severity": "error",
-                    "slide": slide_id,
-                    "message": "Narration exposes internal production/provenance language.",
-                }
-            )
+            if not figure_language:
+                findings.append({
+                    "severity": "warning", "slide": slide_id,
+                    "message": "A textbook figure is selected but the narration does not clearly describe or direct attention to it.",
+                })
         if words > theoretical_capacity * 0.95:
-            findings.append(
-                {
-                    "severity": "warning",
-                    "slide": slide_id,
-                    "message": (
-                        f"Narration is dense for its timing allocation: {words} words for "
-                        f"{seconds} s at {narration_wpm} wpm."
-                    ),
-                }
-            )
+            findings.append({
+                "severity": "warning", "slide": slide_id,
+                "message": f"Narration is dense for its timing allocation: {words} words for {seconds} s at {narration_wpm} wpm.",
+            })
     return findings
-
 
 def polish_lesson_narration(
     manifest: dict,

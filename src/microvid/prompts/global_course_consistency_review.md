@@ -24,3 +24,10 @@ If targeted lesson changes are required, provide concise, actionable `lesson_rev
 If this is a final verification after targeted revisions, return `ready` only if no blocking issue remains.
 
 Return only JSON conforming to the supplied schema.
+For a textbook-subchapter source, also treat these as course-level consistency requirements:
+- the title/introduction/concept/check/conclusion structure remains intact;
+- only Slide 1 has a visible title;
+- selected textbook figures are relevant, non-decorative, and not overused;
+- figure-bearing slides leave enough room for comfortable visual inspection;
+- narration does not repeat the same explanation across slides or drift into adjacent textbook chapters;
+- narration contains no raw symbolic/TeX math, page counters, citation markers, source artefacts, or invented course framing.

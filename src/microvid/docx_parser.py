@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 import re
+from collections.abc import Iterable
 from pathlib import Path
-from typing import Iterable
 
 from docx import Document
 from docx.oxml.ns import qn
@@ -210,12 +209,8 @@ def write_extraction(
     output: str | Path,
     parser_config: dict | None = None,
 ) -> dict:
-    # Keep this compatibility entry point because the CLI historically imported it
-    # from docx_parser.  The actual source-format dispatch now lives in source_parser.
-    from .source_parser import extract_source
+    # Compatibility entry point retained for older callers. The generic writer also
+    # records textbook-subchapter raw/scoping sidecars when that treatment is applied.
+    from .source_parser import write_extraction as write_source_extraction
 
-    payload = extract_source(path, parser_config=parser_config)
-    output = Path(output)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
-    return payload
+    return write_source_extraction(path, output, parser_config=parser_config)

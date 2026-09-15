@@ -49,3 +49,19 @@ Read the narration mentally as continuous speech from the first slide to the las
 ## 10. Output contract
 
 Return only the narration-polish data required by the supplied JSON schema. Keep the slide order exactly unchanged. Do not output revised slide titles, on-screen bullets, equations, visual directions, source IDs, or lesson structure.
+
+## 11. Additional rules for textbook-subchapter narration
+
+When `source_document.classification.kind` is `textbook_subchapter`, apply all of the following as hard requirements:
+
+- Explain only the concept shown on the current slide.
+- Use clear spoken lecture style; define technical terms before relying on them.
+- If the slide contains a formula, speak the mathematical relationship in natural English and briefly explain the meaning of each quantity in words.
+- If the slide contains one or more selected textbook figures, briefly describe what the figure shows and connect it directly to the concept being explained.
+- Avoid repeating the same explanation on later slides.
+- Do not mention other chapters, other slide decks, prior conversations, or external knowledge unless that material is explicitly grounded in the current supplied files.
+- Do not read or expose LaTeX, TeX, dollar-delimited math, backslash commands, raw symbolic equations, subscripts, superscripts, page counters, slide counters, citation markers, grounding markers, source IDs, or bracketed provenance artefacts.
+- Rewrite every mathematical statement as plain spoken English suitable for text-to-speech.
+- Slide 1 may introduce the lesson briefly in narration, but its visible slide must remain title-only. Slides 2 onward must not rely on a visible slide title for meaning.
+
+Before returning, silently check the complete narration sequence against these rules and repair any violation.

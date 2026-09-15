@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import yaml
@@ -17,7 +18,7 @@ def validate_manifest(m: dict) -> list[dict]:
         issues.append(
             {
                 "severity": "error",
-                "message": "Lesson matched zero authoritative source blocks. The global plan or legacy profile is incompatible with this DOCX.",
+                "message": "Lesson matched zero authoritative source blocks. The global plan or legacy profile is incompatible with this source document.",
             }
         )
 
@@ -50,8 +51,28 @@ def validate_manifest(m: dict) -> list[dict]:
         )
     if not any(s.get("slide_type") == "check" for s in slides):
         issues.append({"severity": "error", "message": "No check-your-understanding slide."})
+
+    if m.get("source_document_type") == "textbook_subchapter":
+        if len(slides) < 5:
+            issues.append({"severity": "error", "message": "Textbook subchapter requires at least five slides."})
+        if not slides or slides[0].get("slide_type") != "title":
+            issues.append({"severity": "error", "message": "Textbook subchapter must begin with a title slide."})
+        if slides and str(slides[0].get("title", "")).strip() != str(m.get("title", "")).strip():
+            issues.append({"severity": "error", "message": "Textbook title slide must use the exact lesson title."})
+        if slides and (slides[0].get("onscreen") or slides[0].get("figure_ids")):
+            issues.append({"severity": "error", "message": "Textbook title slide must contain only the exact title."})
+        if len(slides) < 2 or slides[1].get("slide_type") != "introduction":
+            issues.append({"severity": "error", "message": "Textbook subchapter must include an introduction slide immediately after the title."})
+        if any(str(slide.get("title", "")).strip() for slide in slides[1:]):
+            issues.append({"severity": "error", "message": "Textbook slides after Slide 1 must not contain visible slide titles."})
+        if not slides or slides[-1].get("slide_type") != "conclusion":
+            issues.append({"severity": "error", "message": "Textbook subchapter must end with a conclusion slide."})
+        if m.get("figure_assets") and not any(slide.get("figure_ids") for slide in slides):
+            issues.append({"severity": "error", "message": "Relevant textbook figure assets are available but none are used in the lesson."})
     if len(slides) > 9:
         issues.append({"severity": "warning", "message": f"High slide count: {len(slides)}."})
+    textbook = m.get("source_document_type") == "textbook_subchapter"
+    valid_figure_ids = {str(item.get("id")) for item in m.get("figure_assets", []) or []}
     for s in slides:
         if not s.get("narration"):
             issues.append(
@@ -75,6 +96,18 @@ def validate_manifest(m: dict) -> list[dict]:
                     "message": "On-screen text is dense.",
                 }
             )
+        if textbook:
+            visible = " ".join(str(x) for x in s.get("onscreen", []))
+            narration = str(s.get("narration", ""))
+            invalid_figures = [str(x) for x in s.get("figure_ids", []) if str(x) not in valid_figure_ids]
+            if invalid_figures:
+                issues.append({"severity": "error", "slide": s.get("id"), "message": f"Unknown textbook figure IDs: {invalid_figures}."})
+            if s.get("figure_ids") and len(visible) > 300:
+                issues.append({"severity": "warning", "slide": s.get("id"), "message": "Figure-bearing textbook slide has dense on-screen text; reduce text for visual readability."})
+            if re.search(r"\b(?:page|slide)\s+\d+(?:\s+of\s+\d+)?\b|(?:cite|filecite)|\bsource[_ ]block\b", visible + " " + narration, flags=re.IGNORECASE):
+                issues.append({"severity": "error", "slide": s.get("id"), "message": "Textbook slide exposes a counter, citation marker, or source artefact."})
+            if re.search(r"\\[A-Za-z]+|\$|[₀-₉]|[⁰¹²³⁴⁵⁶⁷⁸⁹]|[±×÷√∑Σ]|\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[^,.!?;]+", narration):
+                issues.append({"severity": "error", "slide": s.get("id"), "message": "Textbook narration contains symbolic/TeX mathematics instead of plain spoken English."})
     return issues
 
 
