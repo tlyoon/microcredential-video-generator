@@ -1,6 +1,6 @@
 # Configuration Reference
 
-This document describes the configuration surfaces of **Microcredential Video Generator v0.7.0**. The production default is whole-document Gemini course design, globally informed lesson generation/review, a dedicated narration-only polish pass, whole-course consistency review, then local slide/TTS/media production.
+This document describes the configuration surfaces of **Microcredential Video Generator v0.8.0**. The production default is whole-document Gemini course design, globally informed lesson generation/review, a dedicated narration-only polish pass, whole-course consistency review, then local slide/TTS/media production. Runtime sources may be structured DOCX files or text-readable PDFs.
 
 ## 1. Configuration precedence
 
@@ -24,7 +24,7 @@ course:
   id: heat_transfer
   title: Introduction to Heat Transfer
   audience: First-year engineering students
-  source_role: The explicitly supplied DOCX is the authoritative content source.
+  source_role: The explicitly supplied DOCX or text-readable PDF is the authoritative content source.
   design_principle: Video teaches the reasoning; the source document carries the detail.
   narration_wpm: 130
   max_slides: 7
@@ -60,7 +60,9 @@ The empty `videos` list is deliberate in a newly scaffolded global-first profile
 
 ## 3. Parser configuration
 
-Typical parser settings:
+The source dispatcher chooses the local parser from the file extension: `.docx` uses the DOCX parser and `.pdf` uses the PyMuPDF parser. Both produce the same downstream semantic block schema.
+
+Shared/typical parser settings:
 
 ```yaml
 parser:
@@ -76,13 +78,40 @@ parser:
     - '^example\b'
 ```
 
-Important behavior:
+DOCX behavior:
 
-- pagination is ignored;
+- rendered Word pagination is ignored;
 - semantic heading breadcrumb paths are retained;
 - numeric section labels are optional metadata;
 - custom heading patterns may be supplied;
-- paragraphs, tables, headings, and Office Math provenance are extracted locally.
+- paragraphs, tables, headings, source order, and Office Math provenance are extracted locally.
+
+PDF behavior:
+
+- text is extracted locally with PyMuPDF; no intermediate DOCX conversion is required;
+- physical page numbers are retained only in block provenance metadata and are not used for lesson segmentation;
+- repeated headers/footers and page-number labels are filtered where possible;
+- heading levels are inferred from numbered headings plus font prominence/boldness;
+- equation-like blocks may be identified from math-font prevalence;
+- image-only/scanned PDFs fail visibly when too little extractable text is present; OCR is not invoked automatically;
+- embedded figures/images are not yet passed to Gemini as multimodal inputs.
+
+Optional PDF-tuning keys include:
+
+```yaml
+parser:
+  pdf_min_extractable_characters: 100
+  pdf_header_footer_margin_ratio: 0.09
+  pdf_repeated_margin_min_pages: 3
+  pdf_repeated_margin_fraction: 0.40
+  pdf_page_number_regex: '^(?:page\s+)?\d+\s*$'
+  pdf_heading_min_size_delta: 1.5
+  pdf_heading_max_chars: 180
+  pdf_equation_math_font_fraction: 0.65
+  pdf_equation_max_chars: 500
+```
+
+These are heuristics rather than semantic truth. When using a new PDF family, inspect `document_structure.json` before expensive Gemini generation.
 
 ## 4. LLM settings
 
@@ -203,7 +232,7 @@ videos:
     forward_links: [...]
 ```
 
-The `source_signature` is computed from the complete prompt-facing extraction. A plan is reusable only when the current extraction has the same signature.
+The `source_signature` is computed from the complete prompt-facing extraction. A plan is reusable only when the current extraction has the same signature, regardless of whether the original source was DOCX or PDF.
 
 ## 8. Global-design CLI controls
 
@@ -277,7 +306,7 @@ workspace/<course>/manifests/global_consistency_final.yaml
 
 Possible status values are `ready` and `revision_required`.
 
-The initial review may issue targeted revision instructions for one or more videos. Those lessons are regenerated using their assigned source blocks plus global context. In v0.7.0, any lesson changed by this targeted consistency revision is sent through the dedicated narration-polish pass again before final course verification.
+The initial review may issue targeted revision instructions for one or more videos. Those lessons are regenerated using their assigned source blocks plus global context. In v0.8.0, any lesson changed by this targeted consistency revision is sent through the dedicated narration-polish pass again before final course verification.
 
 If blocking issues remain, normal `microvid slides` is blocked. `--allow-unreviewed-course` exists only as a diagnostic override.
 
@@ -387,7 +416,7 @@ Do not commit API keys, OAuth tokens, service-account JSON, or other credentials
 
 ## 14. Runtime source and workspace isolation
 
-Every build requires an explicit source path. The bundled sample DOCX is never selected automatically.
+Every build requires an explicit source path. The bundled sample DOCX is never selected automatically. Supported runtime source formats are `.docx` and text-readable `.pdf`.
 
 Use a separate workspace for each course/source revision when practical:
 
