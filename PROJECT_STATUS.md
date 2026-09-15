@@ -1,18 +1,22 @@
-# Project Status — v0.7.0
+# Project Status — v0.8.0
 
 ## Project identity
 
-**Microcredential Video Generator** is a generic topic-neutral DOCX-to-narrated-video pipeline. Physics Laboratory 101 remains the bundled reference profile and sample document.
+**Microcredential Video Generator** is a generic topic-neutral DOCX/PDF-to-narrated-video pipeline. Physics Laboratory 101 remains the bundled reference profile and sample course.
 
 ## Implemented
 
-- Generic DOCX semantic extraction with paragraphs, tables, heading hierarchy, and Office Math provenance.
-- Pagination-independent extraction and semantic heading paths.
+- Generic source dispatch for explicit `.docx` and text-readable `.pdf` inputs.
+- DOCX semantic extraction with paragraphs, tables, heading hierarchy, source order, semantic heading paths, and Office Math provenance.
+- Native PDF extraction through PyMuPDF with ordered text blocks, font/heading cues, equation-like text where identifiable, page provenance, and repeated margin boilerplate filtering.
+- Image-only/scanned PDFs fail visibly when too little extractable text is available; OCR is not invoked automatically.
+- PDF page numbers are retained only as provenance metadata; lesson segmentation remains semantic rather than page-based.
+- DOCX and PDF are normalized into the same common semantic block schema before downstream planning.
 - Whole-document Gemini global planning before any production lesson/slide segmentation.
 - Global concept map, pedagogical strategy, video sequence, source-block assignments, prerequisites, already-taught concepts, and forward links.
 - Second Gemini pass reviewing/revising the global course plan against the complete structured source.
 - Deterministic local validation of global plan source IDs and coverage warnings.
-- SHA-256 source signature protection preventing silent reuse of a global plan after DOCX changes.
+- SHA-256 source signature protection preventing silent reuse of a global plan after source-document changes.
 - Per-video Gemini generation using both the global course context and assigned authoritative/reference source blocks.
 - Per-video grounded Gemini scientific/pedagogical review/revision plus local manifest QA.
 - Dedicated Gemini narration-only polishing pass after lesson content/structure has been settled.
@@ -47,7 +51,7 @@
 
 ## Automated validation
 
-The regression suite covers the global-first and narration-first quality concerns, including:
+The regression suite covers the global-first, narration-quality, and PDF-ingestion concerns, including:
 
 - the initial planning prompt contains source content from both the beginning and end of a synthetic DOCX;
 - the global course plan carries the source signature and explicit source-block assignments;
@@ -56,7 +60,13 @@ The regression suite covers the global-first and narration-first quality concern
 - narration polishing preserves slide/source provenance and can add TTS-specific wording without redesigning slides;
 - narration timing metadata is produced;
 - whole-course consistency review runs before the course index is marked ready;
+- PDF extraction preserves semantic headings and page provenance while filtering repeated page headers/footers and page-number labels;
+- the generic source dispatcher retains DOCX support, accepts PDFs, and rejects unsupported file types visibly;
+- image-only PDFs fail visibly rather than entering the planning pipeline with empty content;
+- PDF extraction serializes into the same common schema and is compatible with the global course packet/signature layer;
 - generic parsing/selection, manifest QA, PowerPoint speaker-note persistence, media capabilities, Chirp/SAPI behavior, and scientific speech normalization remain covered.
+
+The v0.8.0 feature was additionally validated against the shared Physics Laboratory 101 PDF: 31 pages, 715 semantic blocks, 190 equation-classified blocks, repeated page boilerplate removed, key numbered sections detected, and the complete source packet remained within the configured global source limit.
 
 No live Gemini or Cloud TTS credentials are stored in the repository. Automated tests use fake/mock LLM responses and must remain independent of private credentials.
 
@@ -75,6 +85,6 @@ The software-level workflow is implemented, but a real production course still r
 
 The global planning pass sends the complete prompt-facing structured extraction and refuses silent truncation. The default upper limit is 800,000 source characters. Very large textbooks should eventually use a hierarchical major-unit/chapter planner rather than arbitrary truncation.
 
-Embedded DOCX figures/images are not yet extracted as multimodal Gemini inputs. Paragraphs, tables, headings, and Office Math are supported; source figures remain a future enhancement.
+Embedded source figures/images are not yet sent as multimodal Gemini inputs. DOCX paragraphs, tables, headings, and Office Math are supported; PDF text/font/layout cues and page provenance are supported. Rich figure extraction and multimodal interpretation remain future enhancements.
 
 Narration timing metrics are estimates based on word count and configured words per minute. Actual Chirp audio duration should eventually be fed back into subtitle/timing validation for production-grade synchronization.
