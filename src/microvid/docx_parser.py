@@ -210,7 +210,11 @@ def write_extraction(
     output: str | Path,
     parser_config: dict | None = None,
 ) -> dict:
-    payload = extract_docx(path, parser_config=parser_config)
+    # Keep this compatibility entry point because the CLI historically imported it
+    # from docx_parser.  The actual source-format dispatch now lives in source_parser.
+    from .source_parser import extract_source
+
+    payload = extract_source(path, parser_config=parser_config)
     output = Path(output)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
