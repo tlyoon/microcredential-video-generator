@@ -6,11 +6,11 @@
 
 The Python package name is `microcredential-video-generator` and the CLI command is `microvid`.
 
-## Production graph — v0.7.0 global-first default
+## Production graph — v0.8.0 global-first default
 
 ```text
-explicit runtime DOCX
-  -> LOCAL semantic extraction + provenance
+explicit runtime DOCX or text-readable PDF
+  -> LOCAL format-aware semantic extraction + provenance
   -> COMPLETE structured extraction
   -> GEMINI global course planning
        -> course summary
@@ -45,8 +45,8 @@ explicit runtime DOCX
 
 ## Source-of-truth layers
 
-1. **Explicit runtime DOCX** — authoritative subject source selected with `--source`.
-2. **Extraction JSON** — ordered semantic blocks with provenance and semantic heading paths.
+1. **Explicit runtime source document** — authoritative subject source selected with `--source`; currently `.docx` or text-readable `.pdf`.
+2. **Extraction JSON** — ordered semantic blocks with provenance and semantic heading paths in a common schema independent of source format.
 3. **Course constraint profile YAML** — audience, parser rules, LLM/TTS configuration, timing limits, and editorial policy. In global mode it does not dictate lesson boundaries.
 4. **Global course plan YAML** — Gemini's reviewed whole-document concept map, lesson segmentation, source block assignments, prerequisites, and sequence. This becomes the design contract for lesson generation.
 5. **Prompt set** — version-controlled global-planning, lesson-generation, lesson-review, narration-polish, and course-consistency policies.
@@ -56,19 +56,29 @@ explicit runtime DOCX
 
 The tracked DOCX under `examples/sample_docs/` is sample data only and is never automatically selected.
 
+## Format-aware local extraction boundary
+
+The binary source document is parsed locally before Gemini sees any content.
+
+For DOCX input, the parser preserves paragraphs, tables, heading hierarchy, source order, semantic heading paths, and Office Math provenance. Readable Office Math tokens are exposed to downstream prompting while raw OMML XML remains local.
+
+For PDF input, PyMuPDF extracts text blocks, font and layout cues, heading structure where inferable, equation-like text where identifiable, and page provenance. Repeated page headers, footers, and page-number labels are filtered conservatively. Page numbers are metadata only and are not used to choose lesson boundaries. Image-only/scanned PDFs fail visibly rather than being silently OCRed.
+
+Both formats are normalized into the same semantic block schema before global planning. Embedded PDF figures/images are not yet sent to Gemini as multimodal source material.
+
 ## Global LLM boundary
 
 Lesson boundaries are not chosen locally before Gemini understands the source.
 
-During global planning, the local parser sends Gemini the complete prompt-facing extraction: block ID, block kind, optional section, heading level/path, text, readable math tokens, and a flag indicating Office Math. Raw OMML XML stays local.
+During global planning, the local format-aware parser sends Gemini the complete prompt-facing extraction: block ID, block kind, optional section, heading level/path, text, readable math tokens where available, and the global course constraints. Source-format-specific binary structures remain local.
 
-Gemini receives the complete document once for planning and again for plan review. The planner may group non-contiguous source blocks into one lesson where that better reflects the conceptual structure.
+Gemini receives the complete structured document once for planning and again for plan review. The planner may group non-contiguous source blocks into one lesson where that better reflects the conceptual structure.
 
 The global-plan schema requires explicit `core_block_ids` and optional `reference_block_ids` for every video. Unknown source IDs are rejected locally.
 
 ## Global plan source signature
 
-A SHA-256 signature is calculated from the complete prompt-facing extraction and stored in `plans/course_plan.yaml`. This prevents a plan from one DOCX revision being silently reused after the source changes.
+A SHA-256 signature is calculated from the complete prompt-facing extraction and stored in `plans/course_plan.yaml`. This prevents a plan from one source revision being silently reused after the source document changes.
 
 `microvid draft` may reuse a plan only when its signature matches the current extraction. `microvid all` replans by default after a fresh extraction; `--reuse-plan` only reuses a source-matched plan.
 
@@ -86,7 +96,7 @@ After global planning, each lesson-generation call receives:
 - authoritative core blocks assigned by the global plan;
 - optional reference blocks assigned by the global plan.
 
-The entire DOCX is therefore not resent for every lesson, but the lesson is never generated without awareness of its role in the whole course.
+The entire source document is therefore not resent for every lesson, but the lesson is never generated without awareness of its role in the whole course.
 
 Each lesson receives a generation pass followed by a grounded scientific/pedagogical review/revision pass by default. Every source-derived slide must cite block IDs supplied in that lesson packet. Invented provenance is rejected.
 
@@ -150,9 +160,11 @@ The LLM provider interface remains separate from extraction, PowerPoint, TTS, an
 
 ## Pagination independence
 
-The parser does not use rendered Word pages. Changes to margins, page breaks, font size, or pagination do not alter the semantic extraction.
+For DOCX input, the parser does not use rendered Word pages. Changes to margins, page breaks, font size, or pagination do not alter semantic lesson selection.
 
-Document structure is represented using heading level, semantic breadcrumb path, source order, block type, optional section identifiers, tables, paragraphs, and Office Math provenance.
+For PDF input, physical page numbers are preserved only as provenance so a reviewer can trace a block back to its page. They are not used as semantic segmentation boundaries. Repeated margin boilerplate is filtered where possible.
+
+Document structure is represented using heading level, semantic breadcrumb path, source order, block type, optional section identifiers, paragraphs/tables or extracted PDF text blocks, readable math information where available, and source-format provenance.
 
 ## Generic-course boundary
 
