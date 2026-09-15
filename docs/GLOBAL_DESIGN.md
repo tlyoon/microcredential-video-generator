@@ -14,9 +14,9 @@ The pre-segmented profile workflow remains available only as an explicit compati
 
 ```text
 LOCAL PC
-  source.docx
+  source.docx or text-readable source.pdf
       ↓
-  semantic extraction
+  format-aware semantic extraction
       ↓
   document_structure.json
       │
@@ -95,9 +95,13 @@ LOCAL PC
 
 ## What is sent during global planning
 
-The DOCX binary itself is not uploaded by this package. It is parsed locally first. Gemini receives a JSON representation containing every extracted semantic block: ID, kind, section, heading level/path, text, readable math tokens, and whether Office Math is present. The complete packet also includes course constraints such as audience, target lesson duration, target total duration, maximum slides, source role, and editorial policy.
+The binary source file itself is not uploaded by this package. It is parsed locally first and normalized into the common semantic block schema.
 
-Raw Office Math XML remains local; readable math tokens are sent instead.
+For DOCX input, the local extractor preserves headings, paragraphs, tables, source order, semantic heading paths, and readable Office Math tokens; raw OMML XML remains local.
+
+For PDF input, PyMuPDF extracts text blocks, font and heading cues, equation-like text where identifiable, and page provenance. Repeated page headers/footers and page-number labels are filtered where possible. PDF page numbers remain provenance metadata only and are not used to choose lesson boundaries. Image-only/scanned PDFs fail visibly rather than being silently OCRed. Embedded PDF figures/images are not yet sent to Gemini as multimodal material.
+
+Gemini receives a JSON representation containing every extracted semantic block: ID, kind, section where available, heading level/path, text, readable math information where available, and course constraints such as audience, target lesson duration, target total duration, maximum slides, source role, and editorial policy.
 
 ## What the global plan contains
 
@@ -135,7 +139,7 @@ This file is the global design contract for later lesson generation.
 
 ## Source-signature protection
 
-The plan stores a SHA-256 signature derived from the complete prompt-facing extraction. If the source DOCX is changed and re-extracted, the signature changes. A stale plan is therefore not silently reused.
+The plan stores a SHA-256 signature derived from the complete prompt-facing extraction. If the source document is changed and re-extracted, the signature changes. A stale plan is therefore not silently reused.
 
 `microvid draft` may reuse an existing plan only when the source signature matches exactly. `microvid all` replans by default because it performs a fresh extraction; `--reuse-plan` allows reuse only when the signature still matches.
 
@@ -147,7 +151,7 @@ This keeps the local call focused while preserving knowledge of the lesson's pla
 
 ## Dedicated narration polishing after lesson review
 
-The first two lesson calls optimize lesson structure, scientific fidelity and pedagogy. Narration quality is important during those passes, but v0.7.0 no longer assumes that the resulting script is final.
+The first two lesson calls optimize lesson structure, scientific fidelity and pedagogy. Narration quality is important during those passes, but v0.8.0 does not assume that the resulting script is final.
 
 A separate Gemini call then receives the fixed lesson manifest and the same source/global context. Its response schema only permits:
 
@@ -182,11 +186,11 @@ workspace/<course>/manifests/global_consistency_final.yaml
 
 ## Commands
 
-Staged production:
+Staged production using a PDF source:
 
 ```powershell
 microvid extract `
-  --source ".\source\my_course.docx" `
+  --source ".\source\my_course.pdf" `
   --workspace ".\workspace\my_course" `
   --profile my_course
 
@@ -202,11 +206,13 @@ microvid slides `
   --workspace ".\workspace\my_course"
 ```
 
+A `.docx` source can be supplied to the same `extract` command.
+
 One-command production:
 
 ```powershell
 microvid all `
-  --source ".\source\my_course.docx" `
+  --source ".\source\my_course.pdf" `
   --workspace ".\workspace\my_course" `
   --profile my_course
 ```
