@@ -1,10 +1,10 @@
 # Microcredential Video Generator — User Manual
 
-**Package version:** 0.7.0  
+**Package version:** 0.8.0  
 **Repository:** `tlyoon/microcredential-video-generator`  
 **CLI command:** `microvid`
 
-This manual explains how to install, configure, and operate the package from a structured teaching DOCX through globally planned Gemini lessons, separately polished narration, PowerPoint slide decks, Google Cloud Chirp 3 HD audio, final MP4 video, and optional YouTube course publishing.
+This manual explains how to install, configure, and operate the package from a structured teaching DOCX or text-readable PDF through globally planned Gemini lessons, separately polished narration, PowerPoint slide decks, Google Cloud Chirp 3 HD audio, final MP4 video, and optional YouTube course publishing.
 
 Physics Laboratory 101 is the bundled reference course. The engine itself is topic-neutral.
 
@@ -26,8 +26,8 @@ Two design rules now govern the production path:
 The normal sequence is:
 
 ```text
-Source DOCX
-  -> local semantic extraction
+Source DOCX or text-readable PDF
+  -> local format-aware semantic extraction
   -> Gemini whole-document comprehension
   -> Gemini global concept/course map
   -> Gemini video segmentation + source-block assignments
@@ -59,8 +59,10 @@ The previous profile-first workflow remains only for explicit compatibility/debu
 
 The following operations are performed on your computer:
 
-- reading the DOCX;
-- extracting headings, paragraphs, tables, source order, and Office Math provenance;
+- reading the explicitly supplied DOCX or text-readable PDF;
+- format-aware extraction into the common semantic block schema;
+- for DOCX, extracting headings, paragraphs, tables, source order, and Office Math provenance;
+- for PDF, extracting text blocks, font/heading cues, equation-like text where identifiable, and page provenance while filtering repeated page boilerplate where possible;
 - creating `document_structure.json`;
 - computing the source signature;
 - validating Gemini source-block IDs;
@@ -99,7 +101,9 @@ Chirp 3 HD receives the spoken narration text after local scientific-speech norm
 
 ## 3. What is sent to Gemini
 
-The package does **not** upload the binary DOCX directly to Gemini. The DOCX is parsed locally first.
+The package does **not** upload the binary DOCX or PDF directly to Gemini. The source is parsed locally first and normalized into a common structured extraction.
+
+For DOCX input, headings, paragraphs, tables, source order, semantic heading paths, and readable Office Math tokens are extracted; raw OMML XML stays local. For PDF input, PyMuPDF extracts text blocks, font/heading cues, equation-like text where identifiable, and page provenance; repeated page headers/footers and page-number labels are filtered where possible. PDF page numbers remain provenance only and are not used as lesson boundaries. Image-only/scanned PDFs fail visibly rather than being silently OCRed.
 
 For global planning, Gemini receives the complete prompt-facing structured extraction. Each block includes information such as:
 
@@ -114,12 +118,11 @@ For global planning, Gemini receives the complete prompt-facing structured extra
     "8.2 Multiplication and division"
   ],
   "text": "...",
-  "math_text": ["..."],
-  "contains_office_math": true
+  "math_text": ["..."]
 }
 ```
 
-Raw OMML XML is retained locally. Readable math tokens are supplied to Gemini instead.
+Format-specific binary structures stay local. Embedded PDF figures/images are not yet supplied to Gemini as multimodal source material.
 
 For per-video generation, Gemini receives the global course map and sequence context plus only the authoritative/reference source blocks assigned to that video.
 
@@ -313,17 +316,27 @@ microvid tts-audition `
 
 ---
 
-## 9. Prepare the source DOCX
+## 9. Prepare the source document
 
-The runtime source is always explicit. The bundled Lab 101 DOCX is never used automatically.
+The runtime source is always explicit. The bundled Lab 101 sample DOCX is never used automatically.
 
-For example:
+Supported source formats are:
+
+```text
+.docx
+.pdf   (text-readable PDF)
+```
+
+Examples:
 
 ```text
 source/my_course.docx
+source/my_course.pdf
 ```
 
-For best results, use meaningful Word heading styles and a coherent hierarchy. Paragraphs, tables, headings, and Office Math are extracted. The parser does not depend on rendered page numbers.
+DOCX works best with meaningful Word heading styles and a coherent hierarchy. Paragraphs, tables, headings, and Office Math are extracted without depending on rendered Word page numbers.
+
+PDF input is parsed natively with PyMuPDF. Repeated page headers/footers and page-number labels are filtered where possible, while page numbers are retained only for provenance. Image-only/scanned PDFs are rejected visibly because OCR is not invoked automatically. Embedded PDF figures/images are not yet passed to Gemini as multimodal source material.
 
 ---
 
@@ -333,14 +346,14 @@ For a new topic:
 
 ```powershell
 microvid scaffold-profile `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
+  --source ".\source\Introduction_to_Heat_Transfer.pdf" `
   --workspace ".\workspace\heat_transfer" `
   --output ".\profiles\heat_transfer.yaml" `
   --course-id "heat_transfer" `
   --title "Introduction to Heat Transfer"
 ```
 
-The scaffold **does not pre-segment the DOCX into videos**. The generated `videos` list is intentionally empty.
+The scaffold **does not pre-segment the source document into videos**. The generated `videos` list is intentionally empty.
 
 Review and edit the course constraints that matter before global planning, especially course title, audience, target video/total duration, maximum slides, parser conventions, LLM model, narration rate, `narration_polish_pass`, editorial policy, and TTS settings.
 
@@ -352,14 +365,16 @@ Gemini will determine the lesson boundaries after reading the complete structure
 
 The staged workflow is best for the first run of a new course because each intermediate artifact can be inspected.
 
-### 11.1 Extract the DOCX locally
+### 11.1 Extract the source locally
 
 ```powershell
 microvid extract `
-  --source ".\source\my_course.docx" `
+  --source ".\source\my_course.pdf" `
   --workspace ".\workspace\my_course" `
   --profile ".\profiles\my_course.yaml"
 ```
+
+A `.docx` path can be supplied in exactly the same command.
 
 Output:
 
@@ -471,10 +486,12 @@ Once the workflow is understood:
 
 ```powershell
 microvid all `
-  --source ".\source\my_course.docx" `
+  --source ".\source\my_course.pdf" `
   --workspace ".\workspace\my_course" `
   --profile ".\profiles\my_course.yaml"
 ```
+
+The same command accepts a `.docx` source.
 
 This performs fresh local extraction, global Gemini course planning/review, per-video lesson generation/review, dedicated narration polishing, whole-course consistency review/revision/verification, slide generation, and structural validation.
 
@@ -490,7 +507,7 @@ A normal `all` run replans after the fresh extraction. Use `--reuse-plan` only w
 source_signature: <sha256>
 ```
 
-The signature is generated from the complete prompt-facing extraction. If the DOCX changes and is re-extracted, the signature changes. A stale plan is not silently applied to a revised source.
+The signature is generated from the complete prompt-facing extraction. If the source document changes and is re-extracted, the signature changes. A stale plan is not silently applied to a revised source.
 
 ---
 
@@ -623,20 +640,22 @@ workspace/my_course/audio/video_NN/tts_manifest.yaml
 
 ## 19. Physics Laboratory 101 reference workflow
 
-Assume the runtime manual is:
+For the current PDF-source pilot, assume the runtime manual is:
 
 ```text
-source/Physics_Laboratory_101_Student_Manual_v2_Corrected.docx
+source/Physics_Laboratory_101_Student_Manual_v2.pdf
 ```
 
 Run:
 
 ```powershell
 microvid all `
-  --source ".\source\Physics_Laboratory_101_Student_Manual_v2_Corrected.docx" `
+  --source ".\source\Physics_Laboratory_101_Student_Manual_v2.pdf" `
   --workspace ".\workspace\lab101" `
   --profile physics_lab_101
 ```
+
+The corrected DOCX version remains equally valid when supplied explicitly with `--source`.
 
 The existing nine-video definitions in the Lab 101 profile do not control the production segmentation in default global mode. They remain for legacy/profile comparison. Narration polishing is enabled explicitly in the Lab 101 profile.
 
@@ -711,6 +730,10 @@ $env:GEMINI_API_KEY
 
 If it is empty, confirm `%LOCALAPPDATA%\Microvid\.env` exists and contains `GEMINI_API_KEY=...`. Also confirm the configured model is available.
 
+### PDF extraction fails with “too little extractable text”
+
+The file is probably image-only/scanned or has insufficient embedded text. v0.8.0 deliberately does not invoke OCR automatically. Provide a text-readable PDF or a DOCX source.
+
 ### Narration polish fails with a speech-hygiene error
 
 Inspect the Gemini output or source for raw LaTeX/code-like text or internal production language in the spoken channel. The narration editor is expected to verbalize mathematics naturally. Exact equations belong in `equation_latex`; TTS-specific wording belongs in `tts_text`.
@@ -752,15 +775,16 @@ Use natural narration and explicit `tts_text` for difficult expressions. Do not 
 For any new course:
 
 1. run `extract`;
-2. run `plan` and inspect `course_plan.yaml`;
-3. run `draft`;
-4. inspect the global consistency reports;
-5. inspect one representative lesson manifest, paying special attention to the polished narration and timing metrics;
-6. build its PPTX and check narration against the visual sequence;
-7. audition/confirm the Chirp voice;
-8. listen to the representative narrated lesson;
-9. approve one lesson;
-10. render one MP4;
-11. only then batch-produce the rest of the course.
+2. inspect `document_structure.json`, especially heading structure and source provenance;
+3. run `plan` and inspect `course_plan.yaml`;
+4. run `draft`;
+5. inspect the global consistency reports;
+6. inspect one representative lesson manifest, paying special attention to the polished narration and timing metrics;
+7. build its PPTX and check narration against the visual sequence;
+8. audition/confirm the Chirp voice;
+9. listen to the representative narrated lesson;
+10. approve one lesson;
+11. render one MP4;
+12. only then batch-produce the rest of the course.
 
-This staged pilot catches global segmentation, scientific content, narration style, voice, and media issues before they are multiplied across the course.
+This staged pilot catches source-extraction, global segmentation, scientific content, narration style, voice, and media issues before they are multiplied across the course.
