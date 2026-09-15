@@ -10,7 +10,6 @@ import yaml
 
 from .assets import write_text_assets
 from .auto_profile import write_scaffold_profile
-from .docx_parser import write_extraction
 from .global_planner import build_global_course_plan, extraction_signature, write_global_course_plan
 from .llm import GeminiProvider, LLMError, provider_from_config
 from .llm_manifest_builder import build_all_manifests_with_llm
@@ -20,6 +19,7 @@ from .profile import load_profile
 from .qa import validate_workspace
 from .runtime_config import load_local_runtime_environment
 from .slides import build_pptx
+from .source_parser import write_extraction
 from .tts import TTSConfig
 from .youtube_publish import (
     DEFAULT_TEMPLATE_PLAYLIST_ID,
@@ -45,10 +45,27 @@ def _plan_path(workspace: Path) -> Path:
     return workspace / "plans" / "course_plan.yaml"
 
 
+def _is_textbook_extraction(extraction: dict | None) -> bool:
+    return bool(
+        extraction
+        and (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
+    )
+
+
+def _load_effective_profile(profile_name: str | None, extraction: dict | None = None) -> dict:
+    name = profile_name or ("generic" if _is_textbook_extraction(extraction) else "physics_lab_101")
+    profile = load_profile(name)
+    if not profile_name and _is_textbook_extraction(extraction):
+        scope = extraction.get("textbook_subchapter_ingestion") or {}
+        title = scope.get("target_title")
+        if title:
+            profile["course"]["title"] = str(title)
+            profile["course"]["id"] = "textbook_" + str(scope.get("target_section", "subchapter")).replace(".", "_")
+    return profile
+
+
 def _parser_config(profile_name: str | None) -> dict | None:
-    if not profile_name:
-        return None
-    return load_profile(profile_name).get("parser")
+    return load_profile(profile_name or "generic").get("parser")
 
 
 def _llm_provider(profile: dict, args):
@@ -88,6 +105,15 @@ def cmd_extract(args) -> int:
     workspace = Path(args.workspace)
     parser_config = _parser_config(getattr(args, "profile", None))
     payload = write_extraction(args.source, _extraction_path(workspace), parser_config=parser_config)
+    kind = (payload.get("source_classification") or {}).get("kind", "unknown")
+    print(f"Source selected: {payload.get('source')} [{payload.get('source_format')}; {kind}]")
+    scope = payload.get("textbook_subchapter_ingestion") or {}
+    if scope.get("applied"):
+        print(
+            "Textbook subchapter ingestion: "
+            f"kept {payload.get('block_count')} of {payload.get('raw_block_count')} blocks; "
+            f"target {scope.get('target_section')} — {scope.get('target_title')}"
+        )
     print(f"Extracted {payload['block_count']} blocks -> {_extraction_path(workspace)}")
     return 0
 
@@ -124,7 +150,7 @@ def _get_or_build_global_plan(workspace: Path, extraction: dict, profile: dict, 
         if existing.get("source_signature") == extraction_signature(extraction):
             print(f"Reusing source-matched global course plan -> {path}")
             return existing
-        print("Existing global plan does not match the current extracted DOCX; replanning.")
+        print("Existing global plan does not match the current extracted source document; replanning.")
 
     plan = build_global_course_plan(
         extraction,
@@ -140,7 +166,7 @@ def _get_or_build_global_plan(workspace: Path, extraction: dict, profile: dict, 
 def cmd_plan(args) -> int:
     workspace = Path(args.workspace)
     extraction = _load_extraction(workspace)
-    profile = load_profile(args.profile)
+    profile = _load_effective_profile(args.profile, extraction)
     provider = _llm_provider(profile, args)
     args.replan = True
     _get_or_build_global_plan(workspace, extraction, profile, provider, args)
@@ -150,9 +176,14 @@ def cmd_plan(args) -> int:
 def cmd_draft(args) -> int:
     workspace = Path(args.workspace)
     extraction = _load_extraction(workspace)
-    profile = load_profile(args.profile)
+    profile = _load_effective_profile(args.profile, extraction)
     generator = getattr(args, "generator", "llm")
     design_mode = getattr(args, "design_mode", "global")
+    if _is_textbook_extraction(extraction) and (generator != "llm" or design_mode != "global"):
+        raise SystemExit(
+            "Textbook-subchapter ingestion requires the global LLM workflow so the mandatory "
+            "title/introduction/concept-check/conclusion architecture can be enforced."
+        )
 
     if generator == "llm":
         provider = _llm_provider(profile, args)
@@ -271,7 +302,10 @@ def cmd_tts_audition(args) -> int:
         "A measured value is incomplete without its uncertainty and units. "
         "For example, an acceleration of 9.81 m s⁻² ± 0.02 m s⁻² should be reported clearly."
     )
-    paths = audition_voices(args.output_dir, text, cfg, voices=args.voices)
+    voices = args.voices
+    if not voices and args.voice_name:
+        voices = [args.voice_name]
+    paths = audition_voices(args.output_dir, text, cfg, voices=voices)
     for path in paths:
         print(f"Built {path}")
     return 0
@@ -389,18 +423,28 @@ def _add_tts_options(p: argparse.ArgumentParser) -> None:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="microvid", description="DOCX-to-microcredential video asset pipeline"
+        prog="microvid", description="DOCX/PDF-to-microcredential video asset pipeline"
     )
     sp = p.add_subparsers(dest="command", required=True)
 
-    e = sp.add_parser("extract", help="Extract semantic blocks and provenance from an explicitly supplied DOCX")
-    e.add_argument("--source", required=True, help="Runtime DOCX. No bundled sample is used implicitly.")
+    e = sp.add_parser(
+        "extract",
+        help="Extract semantic blocks and provenance from an explicitly supplied DOCX or text-readable PDF",
+    )
+    e.add_argument(
+        "--source",
+        default="source",
+        help="Runtime DOCX/PDF file or source directory. Directory mode selects a PDF first and warns on ambiguity.",
+    )
     e.add_argument("--workspace", required=True)
     e.add_argument("--profile", help="Optional profile whose parser conventions should be applied")
     e.set_defaults(func=cmd_extract)
 
-    sc = sp.add_parser("scaffold-profile", help="Create an editable constraint/profile shell for a new DOCX/topic")
-    sc.add_argument("--source", required=True)
+    sc = sp.add_parser(
+        "scaffold-profile",
+        help="Create an editable constraint/profile shell for a new DOCX/PDF topic source",
+    )
+    sc.add_argument("--source", default="source")
     sc.add_argument("--workspace", required=True)
     sc.add_argument("--output", required=True, help="Output YAML profile path")
     sc.add_argument("--course-id", required=True)
@@ -411,16 +455,19 @@ def parser() -> argparse.ArgumentParser:
     sc.add_argument("--max-slides", type=int, default=7)
     sc.set_defaults(func=cmd_scaffold)
 
-    pl = sp.add_parser("plan", help="Have Gemini read the complete extracted DOCX and design the whole course before lesson generation")
+    pl = sp.add_parser(
+        "plan",
+        help="Have Gemini read the complete extracted source document and design the whole course before lesson generation",
+    )
     pl.add_argument("--workspace", required=True)
-    pl.add_argument("--profile", default="physics_lab_101")
+    pl.add_argument("--profile", default=None, help="Course profile. Omit for automatic generic/textbook or Lab 101 selection.")
     _add_llm_options(pl)
     pl.add_argument("--no-plan-review-pass", action="store_true")
     pl.set_defaults(func=cmd_plan)
 
     d = sp.add_parser("draft", help="Build course and lesson manifests")
     d.add_argument("--workspace", required=True)
-    d.add_argument("--profile", default="physics_lab_101")
+    d.add_argument("--profile", default=None, help="Course profile. Omit for automatic generic/textbook or Lab 101 selection.")
     d.add_argument(
         "--generator",
         choices=["llm", "deterministic"],
@@ -448,13 +495,21 @@ def parser() -> argparse.ArgumentParser:
     v.set_defaults(func=cmd_validate)
 
     a = sp.add_parser("all", help="Extract, globally plan, draft, globally review, build slides and validate")
-    a.add_argument("--source", required=True, help="Runtime DOCX. No bundled sample is used implicitly.")
+    a.add_argument(
+        "--source",
+        default="source",
+        help="Runtime DOCX/PDF file or source directory. Directory mode selects a PDF first and warns on ambiguity.",
+    )
     a.add_argument("--workspace", required=True)
-    a.add_argument("--profile", default="physics_lab_101")
+    a.add_argument("--profile", default=None, help="Course profile. Omit for automatic generic/textbook or Lab 101 selection.")
     a.add_argument("--generator", choices=["llm", "deterministic"], default="llm")
     _add_llm_options(a)
     _add_global_design_options(a)
-    a.add_argument("--reuse-plan", action="store_true", help="Reuse an existing plan only when its source signature exactly matches the extracted DOCX.")
+    a.add_argument(
+        "--reuse-plan",
+        action="store_true",
+        help="Reuse an existing plan only when its source signature exactly matches the extracted source document.",
+    )
     a.add_argument("--no-review-pass", action="store_true")
     a.set_defaults(func=cmd_all)
 

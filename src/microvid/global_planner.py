@@ -126,7 +126,27 @@ def _planning_context(extraction: dict, profile: dict) -> dict[str, Any]:
             f"Whole-document planning packet is {source_chars:,} characters, above configured "
             f"global-design limit {max_chars:,}. The package will not silently truncate the source."
         )
+    classification = extraction.get("source_classification") or {}
+    scope = extraction.get("textbook_subchapter_ingestion") or {}
+    is_textbook = classification.get("kind") == "textbook_subchapter"
     return {
+        "source_document": {
+            "format": extraction.get("source_format"),
+            "classification": classification,
+            "textbook_subchapter_ingestion": scope,
+            "available_figures": [
+                {
+                    "id": figure.get("id"),
+                    "page_number": figure.get("page_number"),
+                    "section": figure.get("section"),
+                    "caption": figure.get("caption", ""),
+                    "context": figure.get("context", ""),
+                    "group_label": figure.get("group_label"),
+                    "aspect_ratio": figure.get("aspect_ratio"),
+                }
+                for figure in extraction.get("figure_assets", []) or []
+            ],
+        },
         "course_constraints": {
             "id": course.get("id"),
             "title": course.get("title"),
@@ -146,6 +166,12 @@ def _planning_context(extraction: dict, profile: dict) -> dict[str, Any]:
             "preserve_worked_examples_as_reasoning_units": True,
             "avoid_redundant_reteaching": True,
             "require_source_provenance": True,
+            "textbook_subchapter_mode": is_textbook,
+            "textbook_slide_stack_requirements": (
+                ["title", "introduction", "conceptual check question", "conclusion"]
+                if is_textbook
+                else []
+            ),
         },
         "whole_document_blocks": packet,
     }
@@ -233,6 +259,10 @@ def _normalize_plan(
 
     course = profile.get("course", {})
     normalized = dict(generated)
+    if (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter":
+        normalized["videos"] = [dict(video) for video in generated.get("videos", [])]
+        for video in normalized["videos"]:
+            video["max_slides"] = max(5, int(video.get("max_slides", 5)))
     normalized.update(
         {
             "schema_version": 1,

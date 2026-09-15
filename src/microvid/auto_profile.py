@@ -29,7 +29,7 @@ def scaffold_profile(
             "id": course_id,
             "title": title,
             "audience": "Configure for the intended learners.",
-            "source_role": "The explicitly supplied DOCX is the authoritative content source.",
+            "source_role": "The explicitly supplied DOCX or scoped text-readable PDF is the authoritative content source.",
             "design_principle": "Video teaches the reasoning; the source document carries the detail.",
             "narration_wpm": narration_wpm,
             "max_slides": max_slides,

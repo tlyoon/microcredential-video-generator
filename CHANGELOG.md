@@ -16,6 +16,20 @@ All notable project changes are summarized here.
 - Adapted array-bound schema keywords that the live Gemini endpoint rejects while retaining local cardinality validation.
 - Added bounded retries for transient Google Cloud TTS connection, quota, timeout, and service errors.
 
+## 0.8.0 — Native PDF source ingestion
+
+- Added native input support for text-readable `.pdf` sources alongside the existing `.docx` workflow.
+- Added `src/microvid/pdf_parser.py`, using PyMuPDF to extract ordered semantic text blocks, font/heading cues, equation-like text, and page provenance without converting the PDF to DOCX first.
+- Added `src/microvid/source_parser.py` as the common format-aware dispatcher for `.docx` and `.pdf` sources.
+- Preserved the historical `docx_parser.write_extraction` entry point so existing CLI code now accepts PDFs without changing the downstream global-planning pipeline.
+- Added repeated page-header/footer and page-number filtering while retaining page numbers as provenance metadata only; lesson segmentation remains semantic rather than page-based.
+- Added visible failure for scanned/image-only PDFs with too little extractable text; OCR is intentionally not invoked silently.
+- Preserved the common semantic block schema so PDF extractions feed the same global Gemini planning, source-signature, lesson-generation, narration-polish, consistency-review, slide, TTS, and media stages as DOCX sources.
+- Added `PyMuPDF>=1.24` to project dependencies.
+- Added regression coverage for PDF semantic extraction, heading hierarchy, provenance, header/footer filtering, dispatcher compatibility, image-only failure, common-schema serialization, the legacy CLI extraction entry point, and global-course packet compatibility.
+- Updated CLI help and release documentation to describe DOCX/PDF source support consistently.
+- Validated the feature against the shared Physics Laboratory 101 PDF: 31 pages, 715 semantic blocks, repeated page boilerplate removed, and global-packet compatibility preserved.
+
 ## 0.7.0 — Dedicated Gemini narration polishing
 
 - Promoted narration to a first-class production artifact rather than accepting the script directly from the general slide-generation/review pass.

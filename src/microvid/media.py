@@ -4,11 +4,92 @@ import importlib.util
 import os
 import shutil
 import subprocess
+import tempfile
 from pathlib import Path
+
 import yaml
 
 from .speech import normalize_scientific_speech
 from .tts import TTSConfig, provider_from_tts_config
+
+FFMPEG_PATH_ENV = "MICROVID_FFMPEG"
+FFMPEG_TIMEOUT_ENV = "MICROVID_FFMPEG_TIMEOUT_SECONDS"
+DEFAULT_FFMPEG_TIMEOUT_SECONDS = 300.0
+
+
+def ffmpeg_executable() -> str | None:
+    """Return an explicit, packaged, or PATH-provided FFmpeg executable."""
+    configured = os.environ.get(FFMPEG_PATH_ENV)
+    if configured:
+        candidate = Path(configured).expanduser()
+        if candidate.is_file():
+            return str(candidate.resolve())
+
+    try:
+        import imageio_ffmpeg  # type: ignore
+
+        candidate = Path(imageio_ffmpeg.get_ffmpeg_exe())
+        if candidate.is_file():
+            return str(candidate.resolve())
+    except (ImportError, OSError, RuntimeError):
+        pass
+
+    return shutil.which("ffmpeg")
+
+
+def _ffmpeg_timeout_seconds() -> float:
+    raw = os.environ.get(FFMPEG_TIMEOUT_ENV)
+    if not raw:
+        return DEFAULT_FFMPEG_TIMEOUT_SECONDS
+    try:
+        timeout = float(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{FFMPEG_TIMEOUT_ENV} must be a positive number.") from exc
+    if timeout <= 0:
+        raise RuntimeError(f"{FFMPEG_TIMEOUT_ENV} must be a positive number.")
+    return timeout
+
+
+def _diagnostic_tail(value: str | bytes | None, limit: int = 2000) -> str:
+    if isinstance(value, bytes):
+        value = value.decode(errors="replace")
+    return (value or "").strip()[-limit:]
+
+
+def _run_ffmpeg(arguments: list[str], *, operation: str) -> None:
+    executable = ffmpeg_executable()
+    if not executable:
+        raise RuntimeError(
+            "ffmpeg is not available. Install the package with the [windows] extra, "
+            f"put ffmpeg on PATH, or set {FFMPEG_PATH_ENV}."
+        )
+    timeout = _ffmpeg_timeout_seconds()
+    command = [
+        executable,
+        "-nostdin",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        *arguments,
+    ]
+    try:
+        subprocess.run(
+            command,
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired as exc:
+        detail = _diagnostic_tail(exc.stderr)
+        suffix = f" FFmpeg output: {detail}" if detail else ""
+        raise RuntimeError(
+            f"{operation} timed out after {timeout:g} seconds.{suffix}"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        detail = _diagnostic_tail(exc.stderr or exc.stdout)
+        suffix = f" FFmpeg output: {detail}" if detail else ""
+        raise RuntimeError(f"{operation} failed with exit code {exc.returncode}.{suffix}") from exc
 
 
 def _module_available(name: str) -> bool:
@@ -20,7 +101,7 @@ def _module_available(name: str) -> bool:
 
 def media_capabilities() -> dict[str, bool]:
     return {
-        "ffmpeg": shutil.which("ffmpeg") is not None,
+        "ffmpeg": ffmpeg_executable() is not None,
         "libreoffice": shutil.which("libreoffice") is not None or shutil.which("soffice") is not None,
         "windows": os.name == "nt",
         "powerpoint_automation_possible": os.name == "nt",
@@ -54,25 +135,49 @@ def render_powerpoint(pptx: Path, out_dir: Path, width: int = 1920, height: int 
 
 
 def _make_segment(image: Path, audio: Path, output: Path) -> None:
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg is not available on PATH.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run([
-        "ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(image),
-        "-i", str(audio), "-c:v", "libx264", "-tune", "stillimage",
-        "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p", "-shortest", str(output)
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with tempfile.TemporaryDirectory(prefix="microvid_ffmpeg_segment_") as temp_dir:
+        staging = Path(temp_dir)
+        staged_image = staging / f"slide{image.suffix}"
+        staged_audio = staging / f"narration{audio.suffix}"
+        staged_output = staging / "segment.mp4"
+        shutil.copy2(image, staged_image)
+        shutil.copy2(audio, staged_audio)
+        _run_ffmpeg(
+            [
+                "-y", "-loop", "1", "-framerate", "30", "-i", str(staged_image),
+                "-i", str(staged_audio), "-c:v", "libx264", "-tune", "stillimage",
+                "-c:a", "aac", "-b:a", "192k", "-pix_fmt", "yuv420p",
+                "-shortest", str(staged_output),
+            ],
+            operation=f"Building media segment {output.name}",
+        )
+        shutil.copy2(staged_output, output)
 
 
 def concat_segments(segments: list[Path], output: Path) -> None:
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError("ffmpeg is not available on PATH.")
     output.parent.mkdir(parents=True, exist_ok=True)
-    listing = output.with_suffix(".concat.txt")
-    listing.write_text("\n".join(f"file '{p.resolve().as_posix()}'" for p in segments), encoding="utf-8")
-    subprocess.run([
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(listing), "-c", "copy", str(output)
-    ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with tempfile.TemporaryDirectory(prefix="microvid_ffmpeg_concat_") as temp_dir:
+        staging = Path(temp_dir)
+        staged_segments: list[Path] = []
+        for index, segment in enumerate(segments, start=1):
+            staged = staging / f"segment_{index:04d}{segment.suffix}"
+            shutil.copy2(segment, staged)
+            staged_segments.append(staged)
+        listing = staging / "segments.concat.txt"
+        listing.write_text(
+            "\n".join(f"file '{path.name}'" for path in staged_segments),
+            encoding="utf-8",
+        )
+        staged_output = staging / "video.mp4"
+        _run_ffmpeg(
+            [
+                "-y", "-f", "concat", "-safe", "0", "-i", str(listing),
+                "-c", "copy", str(staged_output),
+            ],
+            operation=f"Concatenating final video {output.name}",
+        )
+        shutil.copy2(staged_output, output)
 
 
 def _tts_text(slide: dict, config: TTSConfig) -> str:

@@ -42,6 +42,24 @@ def test_explicit_environment_values_take_precedence(tmp_path):
     assert result.google_credentials_file == explicit_credentials.resolve()
 
 
+def test_dotenv_supports_inline_comments_without_truncating_literal_hashes(tmp_path):
+    config_dir = tmp_path / "Microvid"
+    config_dir.mkdir()
+    (config_dir / ".env").write_text(
+        "GEMINI_API_KEY=AIza-example-key   # rotated locally\n"
+        'QUOTED_VALUE="value # retained" # trailing comment\n'
+        "LITERAL_HASH=value#retained\n",
+        encoding="utf-8",
+    )
+    environ = {}
+
+    load_local_runtime_environment(environ, config_dir=config_dir)
+
+    assert environ["GEMINI_API_KEY"] == "AIza-example-key"
+    assert environ["QUOTED_VALUE"] == "value # retained"
+    assert environ["LITERAL_HASH"] == "value#retained"
+
+
 def test_uses_the_only_json_file_when_google_filename_is_unchanged(tmp_path):
     config_dir = tmp_path / "Microvid"
     config_dir.mkdir()

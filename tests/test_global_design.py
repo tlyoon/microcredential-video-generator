@@ -1,5 +1,5 @@
-from docx import Document
 import yaml
+from docx import Document
 
 from microvid.docx_parser import extract_docx
 from microvid.global_planner import build_global_course_plan, extraction_signature

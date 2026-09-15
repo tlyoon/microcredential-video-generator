@@ -1,9 +1,9 @@
 # Microcredential Video Generator
 
-A reusable Python pipeline that converts a structured teaching `.docx` into short narrated microcredential videos using whole-document Gemini course design, LLM-authored slide content, dedicated narration polishing, PowerPoint, configurable TTS, and FFmpeg assembly.
+A reusable Python pipeline that converts a structured teaching `.docx` or text-readable `.pdf` into short narrated microcredential videos using whole-document Gemini course design, LLM-authored slide content, dedicated narration polishing, PowerPoint, configurable TTS, and FFmpeg assembly.
 
 **Repository:** `tlyoon/microcredential-video-generator`  
-**Current package version:** `0.7.0`  
+**Current package version:** `0.8.0`  
 **CLI command:** `microvid`
 
 Physics Laboratory 101 is the bundled reference implementation and sample course profile. The engine itself is topic-neutral.
@@ -25,8 +25,8 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 The production default is **global-first**. Gemini sees the complete structured source document before any video boundaries or slide decks are created. Narration is subsequently treated as a separate editorial artifact rather than accepting the first script produced during slide design.
 
 ```text
-Explicit runtime DOCX
-   -> LOCAL semantic extraction + provenance
+Explicit runtime DOCX or text-readable PDF
+   -> LOCAL format-aware semantic extraction + provenance
    -> GEMINI whole-document comprehension + course segmentation
    -> LOCAL validation of global plan/source IDs
    -> GEMINI global-plan review/revision
@@ -59,7 +59,7 @@ The old workflow, in which a YAML profile predefines video boundaries before Gem
 
 ## What Gemini receives
 
-The DOCX file itself is parsed locally. For global planning, Gemini receives the **complete structured extraction**: block IDs, headings, heading paths, paragraph/table text, readable Office Math tokens, course constraints, and the global planning prompt. Raw OMML XML stays local.
+The source file itself is parsed locally. For DOCX, the extractor preserves headings, paragraphs, tables and readable Office Math tokens while raw OMML stays local. For PDF, PyMuPDF extracts text blocks, font/heading cues, equations where identifiable, and page provenance; repeated page headers/footers are removed. Gemini receives the **complete structured extraction**, not the binary source file.
 
 For an individual video, Gemini receives:
 
@@ -94,6 +94,17 @@ microvid all `
 
 `microvid all` performs extraction, fresh whole-document planning, lesson generation/review, dedicated narration polishing, whole-course consistency review, PowerPoint generation, and validation.
 
+The same command accepts a text-readable PDF, for example:
+
+```powershell
+microvid all `
+  --source ".\source\Physics_Laboratory_101_Student_Manual_v2.pdf" `
+  --workspace ".\workspace\lab101" `
+  --profile physics_lab_101
+```
+
+PDF input is native; conversion to DOCX is not required. Image-only/scanned PDFs are rejected visibly rather than silently OCRed. PDF page numbers are retained only as provenance metadata; lesson segmentation remains semantic rather than page-based. Embedded figures are not yet supplied to Gemini as multimodal inputs.
+
 For a staged workflow:
 
 ```powershell
@@ -120,7 +131,7 @@ The global plan is saved to:
 workspace/my_course/plans/course_plan.yaml
 ```
 
-It carries a source signature. If the extracted DOCX changes, a stale plan is rejected/rebuilt rather than reused silently.
+It carries a source signature. If the extracted source document changes, a stale plan is rejected/rebuilt rather than reused silently.
 
 ## New topic
 
@@ -128,7 +139,7 @@ It carries a source signature. If the extracted DOCX changes, a stale plan is re
 
 ```powershell
 microvid scaffold-profile `
-  --source ".\source\Introduction_to_Heat_Transfer.docx" `
+  --source ".\source\Introduction_to_Heat_Transfer.pdf" `
   --workspace ".\workspace\heat_transfer" `
   --output ".\profiles\heat_transfer.yaml" `
   --course-id "heat_transfer" `
@@ -170,7 +181,7 @@ with:
 GEMINI_API_KEY=your-key
 ```
 
-The CLI loads this file automatically without overriding an environment variable that is already set. The directory can be overridden with `MICROVID_CONFIG_DIR`. Setting the key for only the current shell remains supported:
+The CLI loads this file automatically without overriding an environment variable that is already set. Inline comments are supported when `#` is separated from an unquoted value by whitespace; hashes inside quoted values are preserved. The directory can be overridden with `MICROVID_CONFIG_DIR`. Setting the key for only the current shell remains supported:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
@@ -189,7 +200,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.9
+  speaking_rate: 0.8
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -204,7 +215,9 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`.
+Use `--voice-name` for one explicit audition voice, or repeat `--voice` to compare several voices.
+
+Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`. Windows installations include a packaged FFmpeg binary; FFmpeg work is staged in the system temporary directory so cloud-synced workspace paths do not block encoding.
 
 For automatic Google Cloud authentication, place the service-account file at:
 

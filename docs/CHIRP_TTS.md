@@ -11,7 +11,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.9
+  speaking_rate: 0.8
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -72,6 +72,7 @@ microvid tts-audition `
 ```
 
 Repeat `--voice` when several explicit candidates should be compared.
+For one explicit candidate, `--voice-name en-US-Chirp3-HD-Aoede` is also supported and selects that voice rather than the configured audition list.
 
 ## Render a video with Chirp
 

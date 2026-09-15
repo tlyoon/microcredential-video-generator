@@ -61,3 +61,22 @@ Treat supplied QA findings or whole-course consistency instructions as signals t
 ## Output
 
 Return only the revised manifest data conforming exactly to the supplied schema. The result should be ready for human scientific/editorial approval, but must still be marked downstream as an LLM draft until that approval occurs.
+
+## Textbook-subchapter guardrail
+
+When the current input identifies `source_document.classification.kind` as `textbook_subchapter`,
+the revised lesson must preserve or restore the mandatory structure: first `title`, second
+`introduction`, at least one source-grounded concept-development slide, a conceptual `check`, and
+final `conclusion`. Do not use revision as an opportunity to pull content from adjacent textbook
+sections that were excluded by the ingestion scope.
+
+For textbook-subchapter lessons, also repair any of the following before returning the revised manifest:
+
+- Slide 1 must display only the exact lesson title: no subtitle, figure, page counter, source marker, course code, or extra on-screen text.
+- Slides 2 onward must use an empty `title` field; place visible teaching content in `onscreen`, figures, or `equation_latex` instead.
+- Use only supplied `available_figures`, and only when a figure genuinely helps explain the current slide concept.
+- When a textbook figure is selected, choose a sensible `figure_layout_hint` and reduce on-screen text enough for the figure and text to remain comfortably readable together.
+- Narration for each slide must explain only that slide, define technical terms before relying on them, describe selected figures briefly, and avoid repeating earlier explanations.
+- Formula narration must be natural spoken English that explains the quantities in words. Remove raw LaTeX, TeX, dollar-delimited math, backslash commands, subscripts, superscripts, and symbolic equation strings from narration.
+- Remove page/slide counters, invented framing, citation/grounding markers, source IDs, and bracketed provenance artefacts from visible slide text and narration.
+- Do not mention other chapters, other slide decks, prior conversations, or external knowledge unless clearly grounded in the current supplied files.

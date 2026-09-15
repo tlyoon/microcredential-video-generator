@@ -1,4 +1,5 @@
 from docx import Document
+
 from microvid.docx_parser import extract_docx
 
 

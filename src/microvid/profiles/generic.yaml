@@ -1,0 +1,54 @@
+parser:
+  heading_style_patterns:
+    - '^Heading\s*(\d+)$'
+  use_outline_level: true
+  infer_numbered_headings: false
+  section_number_regex: '^(\d+(?:\.\d+)*)\.?\s+'
+  key_idea_patterns:
+    - '^key\s+idea\b'
+  worked_example_patterns:
+    - '^worked\s+example\b'
+    - '^example\b'
+  contrast_label_patterns:
+    - '^poor:?$'
+    - '^better:?$'
+    - '^weak:?$'
+    - '^incorrect\s+treatment:?$'
+
+course:
+  id: generic_course
+  title: Source-Based Microcredential
+  audience: Undergraduate students
+  source_role: The explicitly supplied DOCX or scoped text-readable PDF is the authoritative content source.
+  design_principle: Video teaches the reasoning; the source document carries the detail.
+  narration_wpm: 130
+  max_slides: 8
+  target_video_minutes: 7
+  target_total_minutes: null
+  llm:
+    provider: gemini
+    model: gemini-flash-latest
+    thinking_level: high
+    api_key_env: GEMINI_API_KEY
+    review_pass: true
+    narration_polish_pass: true
+    max_source_characters_per_lesson: 220000
+    prompt_set: global_design_v1+microcredential_v3+narration_polish_v1
+    global_design:
+      enabled: true
+      max_source_characters: 800000
+      max_videos: 20
+      plan_review_pass: true
+      course_consistency_review: true
+  content_selection:
+    priority_terms: []
+    source_words_per_slide: 110
+    max_context_blocks: 6
+    kind_scores:
+      key_idea: 7
+      worked_example_heading: 7
+      table: 6
+      equation: 5
+      heading: 1
+
+videos: []

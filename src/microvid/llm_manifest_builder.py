@@ -14,6 +14,8 @@ from .qa import validate_manifest
 from .segmenter import lesson_blocks
 
 _ALLOWED_SLIDE_TYPES = [
+    "title",
+    "introduction",
     "hook",
     "concept",
     "worked_example",
@@ -21,6 +23,7 @@ _ALLOWED_SLIDE_TYPES = [
     "interpretation",
     "check",
     "takeaway",
+    "conclusion",
 ]
 
 
@@ -47,6 +50,40 @@ def _source_packet(blocks: list[dict]) -> list[dict[str, Any]]:
     return packet
 
 
+def _lesson_figures(extraction: dict, blocks: list[dict]) -> list[dict[str, Any]]:
+    figures = list(extraction.get("figure_assets", []) or [])
+    if not figures:
+        return []
+    pages = {
+        int((block.get("metadata") or {}).get("page_number", 0) or 0)
+        for block in blocks
+    }
+    block_ids = {str(block.get("id")) for block in blocks}
+    relevant = [
+        figure
+        for figure in figures
+        if int(figure.get("page_number", 0) or 0) in pages
+        or bool(block_ids & {str(x) for x in figure.get("source_block_ids", [])})
+    ]
+    return relevant or figures
+
+
+def _figure_packet(figures: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": figure.get("id"),
+            "page_number": figure.get("page_number"),
+            "section": figure.get("section"),
+            "caption": figure.get("caption", ""),
+            "context": figure.get("context", ""),
+            "group_label": figure.get("group_label"),
+            "aspect_ratio": figure.get("aspect_ratio"),
+            "source_block_ids": figure.get("source_block_ids", []),
+        }
+        for figure in figures
+    ]
+
+
 def _blocks_from_ids(extraction: dict, block_ids: list[str]) -> list[dict]:
     wanted = {str(x) for x in block_ids}
     return [b for b in extraction.get("blocks", []) if str(b.get("id")) in wanted]
@@ -68,7 +105,7 @@ def _lesson_source_blocks(extraction: dict, lesson: dict) -> tuple[list[dict], l
     return lesson_blocks(extraction, lesson)
 
 
-def lesson_manifest_schema(max_slides: int) -> dict[str, Any]:
+def lesson_manifest_schema(max_slides: int, min_slides: int = 4) -> dict[str, Any]:
     slide_schema = {
         "type": "object",
         "properties": {
@@ -79,6 +116,11 @@ def lesson_manifest_schema(max_slides: int) -> dict[str, Any]:
             "lecturer_notes": {"type": "array", "items": {"type": "string"}},
             "visual_direction": {"type": "string"},
             "equation_latex": {"type": ["string", "null"]},
+            "figure_ids": {"type": "array", "items": {"type": "string"}},
+            "figure_layout_hint": {
+                "type": "string",
+                "enum": ["auto", "image_right", "image_left", "image_large", "grid"],
+            },
             "source_block_ids": {"type": "array", "items": {"type": "string"}},
             "estimated_seconds": {"type": "integer", "minimum": 10, "maximum": 180},
         },
@@ -102,7 +144,7 @@ def lesson_manifest_schema(max_slides: int) -> dict[str, Any]:
             "learning_outcomes": {"type": "array", "items": {"type": "string"}},
             "slides": {
                 "type": "array",
-                "minItems": 4,
+                "minItems": min_slides,
                 "maxItems": max_slides,
                 "items": slide_schema,
             },
@@ -143,13 +185,22 @@ def _global_course_context(
 
 
 def _prompt_context(
+    extraction: dict,
     course: dict,
     lesson: dict,
     core: list[dict],
     refs: list[dict],
     global_plan: dict | None = None,
 ) -> dict[str, Any]:
+    classification = extraction.get("source_classification") or {}
+    scope = extraction.get("textbook_subchapter_ingestion") or {}
+    figures = _lesson_figures(extraction, core + refs)
     return {
+        "source_document": {
+            "format": extraction.get("source_format"),
+            "classification": classification,
+            "textbook_subchapter_ingestion": scope,
+        },
         "course": {
             "title": course.get("title"),
             "audience": course.get("audience"),
@@ -174,6 +225,7 @@ def _prompt_context(
         },
         "authoritative_core_blocks": _source_packet(core),
         "reference_blocks": _source_packet(refs),
+        "available_figures": _figure_packet(figures),
     }
 
 
@@ -216,8 +268,10 @@ def _compose_consistency_revision_prompt(
         [
             _read_prompt("system_microcredential_architect.md"),
             _read_prompt("lesson_review.md"),
-            "Revise this lesson specifically to satisfy the whole-course consistency review. "
-            "Preserve source fidelity and the assigned lesson scope.",
+            (
+                "Revise this lesson specifically to satisfy the whole-course consistency review. "
+                "Preserve source fidelity and the assigned lesson scope."
+            ),
             "## CURRENT LESSON INPUT\n```json\n"
             + json.dumps(context, ensure_ascii=False, indent=2)
             + "\n```",
@@ -245,6 +299,8 @@ def _normalize_manifest(
 ):
     valid_ids = {b["id"] for b in core + refs}
     block_by_id = {b["id"]: b for b in extraction.get("blocks", [])}
+    figure_by_id = {str(f.get("id")): f for f in extraction.get("figure_assets", []) or []}
+    valid_figure_ids = set(figure_by_id)
     slides = generated.get("slides", [])
     if not isinstance(slides, list):
         raise LLMError("LLM manifest 'slides' must be a list.")
@@ -256,6 +312,13 @@ def _normalize_manifest(
         if invalid:
             raise LLMError(
                 f"LLM returned source block IDs not supplied to the lesson: {invalid}. "
+                "Generation rejected."
+            )
+        figure_ids = [str(x) for x in slide.get("figure_ids", [])]
+        invalid_figures = [x for x in figure_ids if x not in valid_figure_ids]
+        if invalid_figures:
+            raise LLMError(
+                f"LLM returned figure IDs not supplied to the lesson: {invalid_figures}. "
                 "Generation rejected."
             )
         source_blocks = [block_by_id[x] for x in ids if x in block_by_id]
@@ -277,6 +340,9 @@ def _normalize_manifest(
                 ],
                 "estimated_seconds": int(slide.get("estimated_seconds", 30)),
                 "equation_latex": slide.get("equation_latex"),
+                "figure_ids": figure_ids,
+                "figure_layout_hint": slide.get("figure_layout_hint", "auto"),
+                "figure_assets": [figure_by_id[x] for x in figure_ids if x in figure_by_id],
             }
         )
 
@@ -285,6 +351,10 @@ def _normalize_manifest(
         "video_id": lesson["id"],
         "title": generated.get("lesson_title") or lesson["title"],
         "focus": lesson["focus"],
+        "source_document_type": (extraction.get("source_classification") or {}).get("kind", "structured_document"),
+        "source_classification": extraction.get("source_classification") or {},
+        "textbook_subchapter_ingestion": extraction.get("textbook_subchapter_ingestion") or {},
+        "figure_assets": list(extraction.get("figure_assets", []) or []),
         "learning_outcomes": generated.get("learning_outcomes")
         or lesson.get("learning_outcomes", []),
         "target_minutes": lesson.get(
@@ -338,9 +408,12 @@ def build_lesson_manifest_with_llm(
             f"{max_chars:,}; it will not be truncated silently."
         )
 
+    is_textbook = (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
     max_slides = int(lesson.get("max_slides", course.get("max_slides", 7)))
-    schema = lesson_manifest_schema(max_slides)
-    context = _prompt_context(course, lesson, core, refs, global_plan)
+    if is_textbook:
+        max_slides = max(5, max_slides)
+    schema = lesson_manifest_schema(max_slides, min_slides=5 if is_textbook else 4)
+    context = _prompt_context(extraction, course, lesson, core, refs, global_plan)
     design_mode = "global_llm" if global_plan else "profile"
 
     generated = provider.generate_json(_compose_generation_prompt(context), schema)
@@ -374,6 +447,13 @@ def build_lesson_manifest_with_llm(
     if _narration_polish_enabled(course):
         manifest = polish_lesson_narration(manifest, context, provider)
 
+    if is_textbook:
+        final_errors = [item for item in validate_manifest(manifest) if item.get("severity") == "error"]
+        if final_errors:
+            raise LLMError(
+                "Textbook-subchapter lesson failed mandatory slide-stack validation after review: "
+                f"{final_errors}"
+            )
     return manifest
 
 
@@ -387,10 +467,12 @@ def _revise_for_course_consistency(
     instructions: list[str],
 ) -> dict:
     core, refs = _lesson_source_blocks(extraction, lesson)
-    context = _prompt_context(course, lesson, core, refs, global_plan)
-    schema = lesson_manifest_schema(
-        int(lesson.get("max_slides", course.get("max_slides", 7)))
-    )
+    context = _prompt_context(extraction, course, lesson, core, refs, global_plan)
+    is_textbook = (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
+    max_slides = int(lesson.get("max_slides", course.get("max_slides", 7)))
+    if is_textbook:
+        max_slides = max(5, max_slides)
+    schema = lesson_manifest_schema(max_slides, min_slides=5 if is_textbook else 4)
     revised = provider.generate_json(
         _compose_consistency_revision_prompt(context, manifest, instructions), schema
     )
@@ -408,6 +490,13 @@ def _revise_for_course_consistency(
     )
     if _narration_polish_enabled(course):
         revised_manifest = polish_lesson_narration(revised_manifest, context, provider)
+    if is_textbook:
+        final_errors = [item for item in validate_manifest(revised_manifest) if item.get("severity") == "error"]
+        if final_errors:
+            raise LLMError(
+                "Textbook-subchapter lesson lost its mandatory slide architecture during course-level revision: "
+                f"{final_errors}"
+            )
     return revised_manifest
 
 
