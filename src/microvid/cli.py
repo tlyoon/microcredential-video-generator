@@ -124,7 +124,7 @@ def _get_or_build_global_plan(workspace: Path, extraction: dict, profile: dict, 
         if existing.get("source_signature") == extraction_signature(extraction):
             print(f"Reusing source-matched global course plan -> {path}")
             return existing
-        print("Existing global plan does not match the current extracted DOCX; replanning.")
+        print("Existing global plan does not match the current extracted source document; replanning.")
 
     plan = build_global_course_plan(
         extraction,
@@ -389,17 +389,27 @@ def _add_tts_options(p: argparse.ArgumentParser) -> None:
 
 def parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="microvid", description="DOCX-to-microcredential video asset pipeline"
+        prog="microvid", description="DOCX/PDF-to-microcredential video asset pipeline"
     )
     sp = p.add_subparsers(dest="command", required=True)
 
-    e = sp.add_parser("extract", help="Extract semantic blocks and provenance from an explicitly supplied DOCX")
-    e.add_argument("--source", required=True, help="Runtime DOCX. No bundled sample is used implicitly.")
+    e = sp.add_parser(
+        "extract",
+        help="Extract semantic blocks and provenance from an explicitly supplied DOCX or text-readable PDF",
+    )
+    e.add_argument(
+        "--source",
+        required=True,
+        help="Runtime DOCX or text-readable PDF. No bundled sample is used implicitly.",
+    )
     e.add_argument("--workspace", required=True)
     e.add_argument("--profile", help="Optional profile whose parser conventions should be applied")
     e.set_defaults(func=cmd_extract)
 
-    sc = sp.add_parser("scaffold-profile", help="Create an editable constraint/profile shell for a new DOCX/topic")
+    sc = sp.add_parser(
+        "scaffold-profile",
+        help="Create an editable constraint/profile shell for a new DOCX/PDF topic source",
+    )
     sc.add_argument("--source", required=True)
     sc.add_argument("--workspace", required=True)
     sc.add_argument("--output", required=True, help="Output YAML profile path")
@@ -411,7 +421,10 @@ def parser() -> argparse.ArgumentParser:
     sc.add_argument("--max-slides", type=int, default=7)
     sc.set_defaults(func=cmd_scaffold)
 
-    pl = sp.add_parser("plan", help="Have Gemini read the complete extracted DOCX and design the whole course before lesson generation")
+    pl = sp.add_parser(
+        "plan",
+        help="Have Gemini read the complete extracted source document and design the whole course before lesson generation",
+    )
     pl.add_argument("--workspace", required=True)
     pl.add_argument("--profile", default="physics_lab_101")
     _add_llm_options(pl)
@@ -448,13 +461,21 @@ def parser() -> argparse.ArgumentParser:
     v.set_defaults(func=cmd_validate)
 
     a = sp.add_parser("all", help="Extract, globally plan, draft, globally review, build slides and validate")
-    a.add_argument("--source", required=True, help="Runtime DOCX. No bundled sample is used implicitly.")
+    a.add_argument(
+        "--source",
+        required=True,
+        help="Runtime DOCX or text-readable PDF. No bundled sample is used implicitly.",
+    )
     a.add_argument("--workspace", required=True)
     a.add_argument("--profile", default="physics_lab_101")
     a.add_argument("--generator", choices=["llm", "deterministic"], default="llm")
     _add_llm_options(a)
     _add_global_design_options(a)
-    a.add_argument("--reuse-plan", action="store_true", help="Reuse an existing plan only when its source signature exactly matches the extracted DOCX.")
+    a.add_argument(
+        "--reuse-plan",
+        action="store_true",
+        help="Reuse an existing plan only when its source signature exactly matches the extracted source document.",
+    )
     a.add_argument("--no-review-pass", action="store_true")
     a.set_defaults(func=cmd_all)
 
