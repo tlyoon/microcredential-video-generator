@@ -293,7 +293,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.9
+  speaking_rate: 0.8
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -758,11 +758,20 @@ Also confirm Cloud Text-to-Speech is enabled and the project has suitable permis
 
 ### FFmpeg is missing
 
+Install the project with its Windows extra. This includes a supported FFmpeg binary through `imageio-ffmpeg`:
+
 ```powershell
-ffmpeg -version
+python -m pip install -e ".[windows]"
+microvid media-check
 ```
 
-must work from the same terminal.
+The media pipeline prefers `MICROVID_FFMPEG` when explicitly set, then the packaged binary, then `ffmpeg` on `PATH`. It stages FFmpeg inputs and outputs in the local system temporary directory before copying finished artifacts back, which supports Google Drive and other cloud-synced workspaces.
+
+Each FFmpeg operation has a 300-second timeout. Override it only for unusually slow machines:
+
+```powershell
+$env:MICROVID_FFMPEG_TIMEOUT_SECONDS = "600"
+```
 
 ### TTS pronounces equations badly
 

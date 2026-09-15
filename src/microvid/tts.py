@@ -36,7 +36,7 @@ class TTSConfig:
     voice_name: str = "en-US-Chirp-HD-F"
     ssml_gender: str = "FEMALE"
     audio_encoding: str = "LINEAR16"
-    speaking_rate: float = 0.9
+    speaking_rate: float = 0.8
     location: str = "global"
     normalize_scientific_speech: bool = True
     fallback_provider: str | None = "sapi"

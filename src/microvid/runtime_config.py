@@ -43,6 +43,35 @@ def local_config_directory(
     return Path.home() / "AppData" / "Local" / APP_DIRECTORY_NAME
 
 
+def _dotenv_value(raw_value: str) -> str:
+    """Parse a dotenv value while preserving hashes inside the value itself.
+
+    An unquoted ``#`` starts a comment only when it is preceded by whitespace.
+    Quoted values may contain hashes and may be followed by an inline comment.
+    """
+    value = raw_value.strip()
+    if not value:
+        return value
+
+    if value[0] in {"'", '"'}:
+        quote = value[0]
+        escaped = False
+        for index, character in enumerate(value[1:], start=1):
+            if character == quote and not escaped:
+                remainder = value[index + 1 :].strip()
+                if not remainder or remainder.startswith("#"):
+                    return value[1:index]
+                break
+            escaped = character == "\\" and not escaped
+            if character != "\\":
+                escaped = False
+
+    for index, character in enumerate(value):
+        if character == "#" and (index == 0 or value[index - 1].isspace()):
+            return value[:index].rstrip()
+    return value
+
+
 def _dotenv_entry(line: str) -> tuple[str, str] | None:
     candidate = line.strip().lstrip("\ufeff")
     if not candidate or candidate.startswith("#"):
@@ -57,10 +86,7 @@ def _dotenv_entry(line: str) -> tuple[str, str] | None:
     if not _ENV_KEY.fullmatch(key):
         return None
 
-    value = value.strip()
-    if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
-        value = value[1:-1]
-    return key, value
+    return key, _dotenv_value(value)
 
 
 def _discover_google_credentials(config_dir: Path) -> Path | None:

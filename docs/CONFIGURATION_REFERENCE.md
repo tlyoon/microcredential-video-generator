@@ -327,7 +327,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.9
+  speaking_rate: 0.8
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -385,6 +385,8 @@ Place a `.env` file there containing:
 GEMINI_API_KEY=...
 ```
 
+Inline comments are allowed after unquoted values when separated by whitespace. A `#` inside a quoted value, or attached directly to an unquoted value, is retained as data.
+
 Place the Google Cloud service-account credentials at:
 
 ```text
@@ -405,6 +407,15 @@ Configuration precedence is:
 $env:GEMINI_API_KEY = "..."
 $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\secure\google-credentials.json"
 ```
+
+Media-specific overrides are also available:
+
+```powershell
+$env:MICROVID_FFMPEG = "C:\tools\ffmpeg\bin\ffmpeg.exe"
+$env:MICROVID_FFMPEG_TIMEOUT_SECONDS = "600"
+```
+
+Without an explicit executable override, the packaged `imageio-ffmpeg` binary is preferred over `ffmpeg` on `PATH`. Encoding inputs and outputs are staged in the system temporary directory so cloud-synced workspace paths remain compatible.
 
 Google Cloud CLI-managed Application Default Credentials remain available as an alternative:
 

@@ -181,7 +181,7 @@ with:
 GEMINI_API_KEY=your-key
 ```
 
-The CLI loads this file automatically without overriding an environment variable that is already set. The directory can be overridden with `MICROVID_CONFIG_DIR`. Setting the key for only the current shell remains supported:
+The CLI loads this file automatically without overriding an environment variable that is already set. Inline comments are supported when `#` is separated from an unquoted value by whitespace; hashes inside quoted values are preserved. The directory can be overridden with `MICROVID_CONFIG_DIR`. Setting the key for only the current shell remains supported:
 
 ```powershell
 $env:GEMINI_API_KEY = "your-key"
@@ -200,7 +200,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.9
+  speaking_rate: 0.8
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -215,7 +215,9 @@ microvid tts-audition `
   --tts-config ".\examples\tts\chirp3.example.yaml"
 ```
 
-Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`.
+Use `--voice-name` for one explicit audition voice, or repeat `--voice` to compare several voices.
+
+Windows SAPI remains a configurable fallback. The local media layer records the actual provider/voice/text used for every slide in `tts_manifest.yaml`. Windows installations include a packaged FFmpeg binary; FFmpeg work is staged in the system temporary directory so cloud-synced workspace paths do not block encoding.
 
 For automatic Google Cloud authentication, place the service-account file at:
 

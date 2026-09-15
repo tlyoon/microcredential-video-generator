@@ -25,7 +25,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6"]
-windows = ["pywin32>=306"]
+windows = ["pywin32>=306", "imageio-ffmpeg>=0.6"]
 
 [project.scripts]
 microvid = "microvid.cli:main"

@@ -1,3 +1,4 @@
+from microvid import cli
 from microvid.speech import normalize_scientific_speech
 from microvid.tts import (
     FallbackTTSProvider,
@@ -22,7 +23,7 @@ def test_default_chirp_config_is_en_us_female():
     assert cfg.voice_name == "en-US-Chirp-HD-F"
     assert cfg.ssml_gender == "FEMALE"
     assert cfg.audio_encoding == "LINEAR16"
-    assert cfg.speaking_rate == 0.9
+    assert cfg.speaking_rate == 0.8
     assert cfg.output_suffix == ".wav"
 
 
@@ -51,3 +52,25 @@ def test_transient_tts_errors_are_identified_without_retrying_auth_errors():
 
     assert _is_transient_tts_error(unavailable)
     assert not _is_transient_tts_error(forbidden)
+
+
+def test_tts_audition_voice_name_override_selects_that_voice(monkeypatch, tmp_path):
+    captured = {}
+
+    def fake_audition(output_dir, text, config, voices=None):
+        captured["voices"] = voices
+        return []
+
+    monkeypatch.setattr(cli, "audition_voices", fake_audition)
+    args = cli.parser().parse_args([
+        "tts-audition",
+        "--output-dir",
+        str(tmp_path),
+        "--voice-name",
+        "en-US-Chirp3-HD-Aoede",
+        "--language-code",
+        "en-US",
+    ])
+
+    assert args.func(args) == 0
+    assert captured["voices"] == ["en-US-Chirp3-HD-Aoede"]

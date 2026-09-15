@@ -271,7 +271,10 @@ def cmd_tts_audition(args) -> int:
         "A measured value is incomplete without its uncertainty and units. "
         "For example, an acceleration of 9.81 m s⁻² ± 0.02 m s⁻² should be reported clearly."
     )
-    paths = audition_voices(args.output_dir, text, cfg, voices=args.voices)
+    voices = args.voices
+    if not voices and args.voice_name:
+        voices = [args.voice_name]
+    paths = audition_voices(args.output_dir, text, cfg, voices=voices)
     for path in paths:
         print(f"Built {path}")
     return 0
