@@ -2,7 +2,7 @@ course_id: physics_lab_101
 title: Physics Laboratory 101 — Microcredential Slide Stack and Narration Scripts
 version: lab101_microcredential_v0.1
 generated_at: '2026-09-10'
-generation_note: Draft generated in ChatGPT for repository staging; not a live Gemini API generation. Requires instructor review before approval/media production.
+generation_note: Historical repository-staging draft generated in ChatGPT rather than by the live Gemini API. It is reference material only and does not define a human-approval gate for the current automated pipeline.
 tts_target: Google Cloud Chirp 3 HD, en-GB-Chirp3-HD-Leda or local override
 videos:
   - id: V01

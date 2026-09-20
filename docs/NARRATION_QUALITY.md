@@ -27,14 +27,14 @@ It cannot return replacement slide titles, bullets, equations, visual directions
 
 ## Narration style contract
 
-The final script should sound like an experienced university lecturer speaking naturally to first-year students. It should not sound like textbook prose, an AI summary, marketing copy, or bullet points being read aloud.
+The final script should sound like an experienced university lecturer speaking naturally to first-year students. It should not sound like textbook prose, an AI summary, marketing copy, or bullet points being read aloud. The current prompt uses Feynman-inspired explanatory habits: start from something concrete, expose the question behind the formalism, explain physical meaning before symbol recitation, use analogies sparingly, resolve misconceptions, and keep the reasoning continuous without theatrical imitation.
 
 The dedicated prompt asks Gemini to:
 
 - write for the ear rather than the page;
 - use clear short-to-medium sentences and varied rhythm;
 - explain relationships, reasoning, decisions, misconceptions and interpretation rather than repeat visible text;
-- coordinate speech with `visual_direction` and staged builds;
+- coordinate speech with structured `visual_type`, visual panels, tables, figures, equations, `visual_direction`, and staged builds;
 - create smooth transitions between slides;
 - refer briefly to concepts already taught rather than reteach them;
 - avoid pulling future-course material forward;
@@ -46,7 +46,7 @@ The dedicated prompt asks Gemini to:
 A useful internal model for a substantive slide is:
 
 ```text
-orient attention -> explain relationship -> interpret -> hand off
+question/attention -> explain relationship -> interpret physical meaning -> hand off
 ```
 
 This is guidance, not a rigid template. Hooks, checks and takeaways should remain lighter.
@@ -122,6 +122,6 @@ course:
 
 The engine also defaults this setting to `true` when the field is absent, so older profiles automatically receive the improved narration workflow. Set it to `false` only for cost/diagnostic comparisons.
 
-## Human editorial review still matters
+## Automated production status
 
-The dedicated pass improves fluency and production quality but does not make the result automatically publishable. Before setting `editorial_status: approved`, review representative scripts aloud or with the selected Chirp voice. Check scientific nuance, terminology, pacing, pronunciation, visual synchronization and transitions between slides.
+Narration polish is followed by whole-course consistency review and deterministic QA. The normal production path does not require a human approval status; generated lessons use `editorial_status: automated_ready` and can proceed to media rendering when automated blocking checks pass. Optional listening remains useful while tuning voices or prompts, but it is diagnostic rather than an approval gate.

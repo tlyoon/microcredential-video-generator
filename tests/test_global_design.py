@@ -1,4 +1,4 @@
-import yaml
+﻿import yaml
 from docx import Document
 
 from microvid.docx_parser import extract_docx
@@ -20,22 +20,27 @@ class GlobalFakeProvider:
                 "slides": [
                     {
                         "slide_id": "V01S01",
-                        "narration": "Start with two different questions. One asks how much energy can be stored, while the other asks how effectively supplied input becomes useful output. Keeping those questions separate will organize the whole lesson.",
+                        "narration": "Two questions can sound similar but describe different things. How much energy can a system store, and how much useful output do we obtain from what we supply? Keeping those questions separate organizes the whole lesson.",
                         "tts_text": None,
                     },
                     {
                         "slide_id": "V01S02",
-                        "narration": "Capacity answers the storage question. It describes how much can be stored under the stated conditions, so those conditions are part of what gives the capacity its meaning.",
+                        "narration": "Capacity answers the storage question. It describes how much can be stored under the stated conditions, so those conditions are part of what gives capacity its meaning.",
                         "tts_text": None,
                     },
                     {
                         "slide_id": "V01S03",
-                        "narration": "Efficiency asks something different. Instead of how much can be stored, it compares the useful output with the supplied input. That distinction prevents us from treating capacity and efficiency as interchangeable ideas.",
+                        "narration": "Efficiency asks something different. Instead of how much can be stored, it compares useful output with supplied input. That distinction prevents us from treating capacity and efficiency as interchangeable ideas.",
                         "tts_text": None,
                     },
                     {
                         "slide_id": "V01S04",
-                        "narration": "Pause here and decide which concept answers this question: useful output compared with supplied input. Focus on the type of comparison being made.",
+                        "narration": "Pause here. If the question asks for useful output compared with supplied input, which concept is being tested? Focus on what is being compared.",
+                        "tts_text": None,
+                    },
+                    {
+                        "slide_id": "V01S05",
+                        "narration": "The two ideas now separate cleanly. Capacity is about how much can be stored under stated conditions. Efficiency is about how useful output compares with supplied input. Ask which question the situation is actually posing before choosing the concept.",
                         "tts_text": None,
                     },
                 ]
@@ -50,7 +55,7 @@ class GlobalFakeProvider:
         if "GLOBAL COURSE PLANNING" in prompt or "GLOBAL COURSE PLAN REVIEW" in prompt:
             return {
                 "course_summary": "Energy storage and efficiency form one short conceptual sequence.",
-                "pedagogical_strategy": "Establish storage and capacity before comparing useful output with supplied input.",
+                "pedagogical_strategy": "Begin with two concrete questions, distinguish storage capacity from useful-output efficiency, test the distinction, then synthesize it.",
                 "concept_map": [
                     {
                         "name": "Energy storage",
@@ -73,6 +78,17 @@ class GlobalFakeProvider:
                         "target_minutes": 3,
                         "max_slides": 6,
                         "learning_outcomes": ["Explain the two source concepts and their relationship."],
+                        "opening_question": "Are storing a lot of energy and using supplied energy efficiently the same thing?",
+                        "narrative_arc": [
+                            "Pose the two questions",
+                            "Define storage capacity",
+                            "Contrast efficiency",
+                            "Test the distinction",
+                            "Synthesize the decision rule",
+                        ],
+                        "key_analogy": "",
+                        "likely_misconceptions": ["Capacity and efficiency are interchangeable."],
+                        "visual_strategy": ["two-column comparison", "concept cards", "diagnostic check"],
                         "check_question": "What does efficiency compare?",
                         "takeaways": ["Storage and efficiency answer different questions."],
                         "core_block_ids": ["b0001", "b0002", "b0003", "b0004"],
@@ -90,14 +106,21 @@ class GlobalFakeProvider:
             "learning_outcomes": ["Explain the two source concepts and their relationship."],
             "slides": [
                 {
-                    "slide_type": "hook",
-                    "title": "Two questions about energy",
-                    "onscreen": ["How much can be stored?", "How much useful output do we obtain?"],
-                    "narration": "This lesson connects two questions that belong in one conceptual sequence.",
+                    "slide_type": "introduction",
+                    "title": "From Storage to Efficiency",
+                    "onscreen": ["Two different questions: storage vs useful output"],
+                    "narration": "This lesson begins by separating two questions that sound similar but are not the same.",
                     "lecturer_notes": ["Use the two questions as the organizing contrast."],
-                    "visual_direction": "Show two labeled question cards.",
+                    "visual_direction": "Show two large question cards side by side.",
+                    "visual_type": "comparison",
+                    "visual_panels": [
+                        {"heading": "Storage", "body": ["How much can be stored?"]},
+                        {"heading": "Efficiency", "body": ["How much useful output from supplied input?"]},
+                    ],
+                    "table_headers": [],
+                    "table_rows": [],
                     "equation_latex": None,
-                    "source_block_ids": [],
+                    "source_block_ids": ["b0001", "b0002", "b0003", "b0004"],
                     "estimated_seconds": 30,
                 },
                 {
@@ -106,7 +129,11 @@ class GlobalFakeProvider:
                     "onscreen": ["Capacity: how much can be stored under stated conditions."],
                     "narration": "The source describes capacity as how much can be stored under the stated conditions.",
                     "lecturer_notes": ["Keep the stated conditions visible."],
-                    "visual_direction": "Highlight capacity beside a storage icon.",
+                    "visual_direction": "Use one large capacity card with conditions beneath it.",
+                    "visual_type": "diagram",
+                    "visual_panels": [{"heading": "Capacity", "body": ["Amount stored", "Conditions matter"]}],
+                    "table_headers": [],
+                    "table_rows": [],
                     "equation_latex": None,
                     "source_block_ids": ["b0001", "b0002"],
                     "estimated_seconds": 45,
@@ -117,7 +144,14 @@ class GlobalFakeProvider:
                     "onscreen": ["Efficiency compares useful output with supplied input."],
                     "narration": "Efficiency is about the comparison between useful output and supplied input.",
                     "lecturer_notes": ["Contrast this with capacity rather than treating them as synonyms."],
-                    "visual_direction": "Show input and useful output with an arrow.",
+                    "visual_direction": "Show supplied input flowing toward useful output.",
+                    "visual_type": "process",
+                    "visual_panels": [
+                        {"heading": "Supplied input", "body": []},
+                        {"heading": "Useful output", "body": []},
+                    ],
+                    "table_headers": [],
+                    "table_rows": [],
                     "equation_latex": None,
                     "source_block_ids": ["b0003", "b0004"],
                     "estimated_seconds": 45,
@@ -125,12 +159,37 @@ class GlobalFakeProvider:
                 {
                     "slide_type": "check",
                     "title": "Check the distinction",
-                    "onscreen": ["Which idea answers: useful output compared with supplied input?"],
+                    "onscreen": ["Useful output compared with supplied input — which concept?"],
                     "narration": "Pause and choose which of the two concepts answers this question.",
                     "lecturer_notes": ["Pause briefly."],
-                    "visual_direction": "Display only the question.",
+                    "visual_direction": "Display the question centrally with two choices.",
+                    "visual_type": "comparison",
+                    "visual_panels": [
+                        {"heading": "Capacity", "body": []},
+                        {"heading": "Efficiency", "body": []},
+                    ],
+                    "table_headers": [],
+                    "table_rows": [],
                     "equation_latex": None,
                     "source_block_ids": [],
+                    "estimated_seconds": 30,
+                },
+                {
+                    "slide_type": "conclusion",
+                    "title": "Two questions, two concepts",
+                    "onscreen": ["Capacity -> storage", "Efficiency -> useful output vs supplied input"],
+                    "narration": "Capacity and efficiency answer different physical questions, so identify the question before choosing the concept.",
+                    "lecturer_notes": ["Resolve the opening contrast."],
+                    "visual_direction": "Return to the two original cards, now with concise definitions.",
+                    "visual_type": "comparison",
+                    "visual_panels": [
+                        {"heading": "Capacity", "body": ["How much is stored"]},
+                        {"heading": "Efficiency", "body": ["Useful output relative to supplied input"]},
+                    ],
+                    "table_headers": [],
+                    "table_rows": [],
+                    "equation_latex": None,
+                    "source_block_ids": ["b0001", "b0002", "b0003", "b0004"],
                     "estimated_seconds": 30,
                 },
             ],
@@ -177,9 +236,11 @@ def test_global_planner_reads_the_complete_document_before_segmentation(tmp_path
     assert len(provider.prompts) == 2
     assert "Capacity describes how much energy can be stored" in provider.prompts[0]
     assert "Efficiency compares useful output with supplied input" in provider.prompts[0]
+    assert "Feynman-inspired" in provider.prompts[0]
     assert plan["design_mode"] == "global_llm"
     assert plan["source_signature"] == extraction_signature(extraction)
     assert plan["videos"][0]["core_block_ids"] == ["b0001", "b0002", "b0003", "b0004"]
+    assert plan["videos"][0]["opening_question"].startswith("Are storing")
 
 
 def test_per_lesson_generation_receives_global_map_polish_and_final_course_review(tmp_path):
@@ -205,12 +266,16 @@ def test_per_lesson_generation_receives_global_map_polish_and_final_course_revie
     assert lesson_prompts
     assert "global_course_context" in lesson_prompts[0]
     assert "Energy storage and efficiency form one short conceptual sequence" in lesson_prompts[0]
+    assert "opening_question" in lesson_prompts[0]
     assert any("DEDICATED NARRATION POLISH PASS" in p for p in provider.prompts)
     assert any("WHOLE-COURSE CONSISTENCY REVIEW" in p for p in provider.prompts)
 
     manifest = yaml.safe_load(paths[0].read_text())
     assert manifest["generation"]["narration_polish"]["enabled"] is True
-    assert manifest["slides"][0]["narration"].startswith("Start with two different questions")
+    assert manifest["editorial_status"] == "automated_ready"
+    assert manifest["slides"][0]["slide_type"] == "introduction"
+    assert manifest["slides"][-1]["slide_type"] == "conclusion"
+    assert manifest["slides"][0]["narration"].startswith("Two questions can sound similar")
 
     index = yaml.safe_load((tmp_path / "manifests" / "course.yaml").read_text())
     assert index["design_mode"] == "global_llm"

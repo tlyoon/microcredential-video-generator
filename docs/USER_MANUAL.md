@@ -293,7 +293,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.8
+  speaking_rate: 1.2
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -561,6 +561,14 @@ lecturer_notes:
   - teaching emphasis
 visual_direction: >
   Show the contributions sequentially.
+visual_type: process
+visual_panels:
+  - heading: Measure
+    body: [record value and uncertainty]
+  - heading: Propagate
+    body: [combine source-supported contributions]
+table_headers: []
+table_rows: []
 equation_latex: null
 source_block_ids: [b0214, b0215]
 estimated_seconds: 70
@@ -568,29 +576,23 @@ narration_word_count: 96
 narration_estimated_spoken_seconds: 44.3
 ```
 
-The manifest also records source assignments, Gemini provider/model, generation pass count, narration-polish provenance, design mode, narration-quality findings, and editorial status.
+The manifest also records source assignments, Gemini provider/model, generation pass count, narration-polish provenance, design mode, narration-quality findings, visual structure, and automated production status.
 
 ---
 
-## 16. Human review and approval
+## 16. Automated review and production gating
 
-Even after Gemini's scientific/pedagogical review, dedicated narration polish, and whole-course consistency review, final acceptance remains human-controlled.
+The normal workflow does not require a human approval flag. Lesson generation is followed by a grounded revision pass, dedicated narration polish, whole-course consistency review, targeted revision when necessary, and deterministic QA. Blocking QA findings stop the automated path; nonblocking warnings remain visible for diagnostics.
 
-Review factual fidelity, equations/units/assumptions, conceptual sequence, slide density, narration naturalness, visual synchronization, pacing, pronunciation, source provenance, duration, and assessment quality.
-
-For narration, the best check is to **listen to at least one representative lesson using the intended Chirp voice**, not merely read the text.
-
-Generated lessons begin as:
+Generated lessons use:
 
 ```yaml
-editorial_status: llm_draft_requires_review
+editorial_status: automated_ready
 ```
 
-After approval, change to:
+The status records that the lesson passed through the automated production workflow; it is not a claim that source ambiguities may be guessed. Ambiguous textbook boundaries and other unsafe source conditions still fail visibly.
 
-```yaml
-editorial_status: approved
-```
+You may still audition a representative TTS output or inspect a deck when desired, but this is optional quality observation rather than a required approval step.
 
 ---
 
@@ -612,7 +614,7 @@ The narration editor may propose `tts_text` when useful, and the local TTS layer
 
 ## 18. Generate final media
 
-After approving a lesson:
+After the lesson passes the automated generation/QA workflow:
 
 ```powershell
 microvid media `

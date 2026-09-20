@@ -65,8 +65,13 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
             "title": {"type": "string"},
             "focus": {"type": "string"},
             "target_minutes": {"type": "number", "minimum": 2, "maximum": 20},
-            "max_slides": {"type": "integer", "minimum": 4, "maximum": 12},
+            "max_slides": {"type": "integer", "minimum": 5, "maximum": 12},
             "learning_outcomes": {"type": "array", "items": {"type": "string"}},
+            "opening_question": {"type": "string"},
+            "narrative_arc": {"type": "array", "minItems": 3, "maxItems": 6, "items": {"type": "string"}},
+            "key_analogy": {"type": "string"},
+            "likely_misconceptions": {"type": "array", "items": {"type": "string"}},
+            "visual_strategy": {"type": "array", "minItems": 2, "maxItems": 6, "items": {"type": "string"}},
             "check_question": {"type": "string"},
             "takeaways": {"type": "array", "items": {"type": "string"}},
             "core_block_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
@@ -82,6 +87,11 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
             "target_minutes",
             "max_slides",
             "learning_outcomes",
+            "opening_question",
+            "narrative_arc",
+            "key_analogy",
+            "likely_misconceptions",
+            "visual_strategy",
             "check_question",
             "takeaways",
             "core_block_ids",
@@ -259,10 +269,9 @@ def _normalize_plan(
 
     course = profile.get("course", {})
     normalized = dict(generated)
-    if (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter":
-        normalized["videos"] = [dict(video) for video in generated.get("videos", [])]
-        for video in normalized["videos"]:
-            video["max_slides"] = max(5, int(video.get("max_slides", 5)))
+    normalized["videos"] = [dict(video) for video in generated.get("videos", [])]
+    for video in normalized["videos"]:
+        video["max_slides"] = max(5, int(video.get("max_slides", 5)))
     normalized.update(
         {
             "schema_version": 1,

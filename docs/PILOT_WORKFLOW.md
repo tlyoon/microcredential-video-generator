@@ -129,7 +129,7 @@ Check that the script:
 - fits comfortably within the allocated slide time;
 - preserves all scientific qualifications and assumptions.
 
-The narration polish stage is source-grounded but remains subject to human review. See `docs/NARRATION_QUALITY.md` for the full contract.
+The narration polish stage is source-grounded and is followed by automated consistency review and deterministic QA. No human approval step is required. See `docs/NARRATION_QUALITY.md` for the full contract.
 
 ## 8. Build the representative PowerPoint
 
@@ -141,19 +141,11 @@ microvid slides `
 
 Review visible slides and speaker notes together. Speaker notes contain the final polished narration and production guidance.
 
-## 9. Review the complete lesson
+## 9. Inspect the automated lesson when desired
 
-Check source block IDs/fidelity, equations, units, numerical values, assumptions, global-course fit, slide density, polished narration, `tts_text`, timing, lecturer notes, visual directions, assessment, and editorial flags.
+The normal pipeline already runs grounded lesson revision, narration polish, whole-course consistency review, and deterministic QA. Optional inspection may still check source fidelity, equations, slide readability, visual synchronization, narration, timing, and TTS pronunciation, but no status edit or human approval is required. Generated manifests use `editorial_status: automated_ready`.
 
-## 10. Approve the representative lesson
-
-Only after scientific/editorial review, set:
-
-```yaml
-editorial_status: approved
-```
-
-## 11. Render the pilot MP4 with Chirp
+## 10. Render the pilot MP4 with Chirp
 
 ```powershell
 microvid media `
@@ -177,17 +169,15 @@ workspace/lab101/audio/video_05/tts_manifest.yaml
 
 Confirm the intended provider and voice were actually used.
 
-## 12. Listen, do not only read
+## 11. Optional auditory spot-check
 
-The final narration quality test should be auditory. Listen to the entire representative video and check cadence, pauses, sentence rhythm, mathematical pronunciation, timing against visual builds, and whether transitions feel natural. If needed, edit `narration`/`tts_text` manually before approving the remaining course.
+When developing or tuning the package, listening to a representative video is useful for assessing cadence, mathematical pronunciation, timing against visual builds, and transitions. This is an optional diagnostic step, not an approval gate.
 
-## 13. Lock production conventions
+## 12. Lock production conventions
 
-After the representative video is accepted, record decisions for narrator voice, speaking rate, slide density, equation presentation, narration tone, worked-example pacing, visual/build conventions, pause timing, and scientific-speech overrides.
+Record desired defaults for narrator voice, speaking rate, slide density, equation presentation, narration tone, worked-example pacing, visual/build conventions, pause timing, and scientific-speech overrides, then batch-produce the remaining globally planned lessons.
 
-Then review/approve and batch-produce the remaining globally planned lessons.
-
-## 14. Legacy comparison only
+## 13. Legacy comparison only
 
 The old nine-video Lab 101 profile remains available for comparison:
 

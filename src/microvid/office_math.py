@@ -15,6 +15,15 @@ _MATH_SIGNAL = re.compile(
     r"|->|[=±×÷≈≠≤≥√∑∝^]|\b(?:rho|pi|sigma|delta)\b)",
     flags=re.IGNORECASE,
 )
+_LEGACY_MATH_SIGNAL = re.compile(
+    r"(?:\\[A-Za-z]+|->|<=|>=|!=|\+/-"
+    r"|[=+^%\u00b1\u00d7\u00f7\u2248\u2260\u2264\u2265\u221a\u2211\u221d\u2192]"
+    r"|[\u2070\u00b9\u00b2\u00b3\u2074-\u2079\u207a\u207b]"
+    r"|[\u2080-\u2089]|[\u0370-\u03ff]"
+    r"|\b[A-Za-z][A-Za-z0-9]*\s*_\s*(?:\{[^}]+\}|[A-Za-z0-9]+)"
+    r"|\b(?:alpha|beta|delta|epsilon|lambda|mu|omega|pi|rho|sigma|theta)\b)",
+    flags=re.IGNORECASE,
+)
 _TOKEN = re.compile(
     r"(->|<=|>=|!=|\+/-|\\[A-Za-z]+|[A-Za-z]+|\d+(?:\.\d+)?|\s+|.)"
 )
@@ -83,16 +92,18 @@ def _escaped_text(text: str) -> str:
 
 
 def _normalize_sqrt_calls(text: str) -> str:
-    """Turn ASCII sqrt(...) calls into LaTeX radicals with balanced scope."""
+    """Turn ASCII sqrt(...) or sqrt[...] calls into radicals with balanced scope."""
     result: list[str] = []
     cursor = 0
-    while match := re.search(r"\bsqrt\s*\(", text[cursor:], flags=re.IGNORECASE):
+    while match := re.search(r"\bsqrt\s*([\[(])", text[cursor:], flags=re.IGNORECASE):
         start = cursor + match.start()
         opening = cursor + match.end() - 1
+        opening_char = text[opening]
+        closing_char = ")" if opening_char == "(" else "]"
         depth = 1
         closing = opening + 1
         while closing < len(text) and depth:
-            depth += (text[closing] == "(") - (text[closing] == ")")
+            depth += (text[closing] == opening_char) - (text[closing] == closing_char)
             closing += 1
         if depth:
             break

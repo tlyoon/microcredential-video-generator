@@ -105,7 +105,16 @@ def _lesson_source_blocks(extraction: dict, lesson: dict) -> tuple[list[dict], l
     return lesson_blocks(extraction, lesson)
 
 
-def lesson_manifest_schema(max_slides: int, min_slides: int = 4) -> dict[str, Any]:
+def lesson_manifest_schema(max_slides: int, min_slides: int = 5) -> dict[str, Any]:
+    visual_panel_schema = {
+        "type": "object",
+        "properties": {
+            "heading": {"type": "string"},
+            "body": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["heading", "body"],
+        "additionalProperties": False,
+    }
     slide_schema = {
         "type": "object",
         "properties": {
@@ -115,6 +124,17 @@ def lesson_manifest_schema(max_slides: int, min_slides: int = 4) -> dict[str, An
             "narration": {"type": "string"},
             "lecturer_notes": {"type": "array", "items": {"type": "string"}},
             "visual_direction": {"type": "string"},
+            "visual_type": {
+                "type": "string",
+                "enum": ["auto", "text", "process", "comparison", "table", "diagram", "equation_focus", "figure"],
+            },
+            "visual_panels": {"type": "array", "maxItems": 6, "items": visual_panel_schema},
+            "table_headers": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
+            "table_rows": {
+                "type": "array",
+                "maxItems": 10,
+                "items": {"type": "array", "maxItems": 6, "items": {"type": "string"}},
+            },
             "equation_latex": {"type": ["string", "null"]},
             "figure_ids": {"type": "array", "items": {"type": "string"}},
             "figure_layout_hint": {
@@ -131,6 +151,10 @@ def lesson_manifest_schema(max_slides: int, min_slides: int = 4) -> dict[str, An
             "narration",
             "lecturer_notes",
             "visual_direction",
+            "visual_type",
+            "visual_panels",
+            "table_headers",
+            "table_rows",
             "equation_latex",
             "source_block_ids",
             "estimated_seconds",
@@ -170,6 +194,11 @@ def _global_course_context(
                 "id": video.get("id"),
                 "title": video.get("title"),
                 "focus": video.get("focus"),
+                "opening_question": video.get("opening_question", ""),
+                "narrative_arc": video.get("narrative_arc", []),
+                "key_analogy": video.get("key_analogy", ""),
+                "likely_misconceptions": video.get("likely_misconceptions", []),
+                "visual_strategy": video.get("visual_strategy", []),
                 "prerequisite_video_ids": video.get("prerequisite_video_ids", []),
                 "already_taught": video.get("already_taught", []),
                 "forward_links": video.get("forward_links", []),
@@ -219,6 +248,11 @@ def _prompt_context(
             "learning_outcomes": lesson.get("learning_outcomes", []),
             "check_question": lesson.get("check_question"),
             "takeaways": lesson.get("takeaways", []),
+            "opening_question": lesson.get("opening_question", ""),
+            "narrative_arc": lesson.get("narrative_arc", []),
+            "key_analogy": lesson.get("key_analogy", ""),
+            "likely_misconceptions": lesson.get("likely_misconceptions", []),
+            "visual_strategy": lesson.get("visual_strategy", []),
             "prerequisite_video_ids": lesson.get("prerequisite_video_ids", []),
             "already_taught": lesson.get("already_taught", []),
             "forward_links": lesson.get("forward_links", []),
@@ -331,6 +365,10 @@ def _normalize_manifest(
                 "narration": slide.get("narration", ""),
                 "lecturer_notes": slide.get("lecturer_notes", []),
                 "visual_direction": slide.get("visual_direction", ""),
+                "visual_type": slide.get("visual_type", "auto"),
+                "visual_panels": slide.get("visual_panels", []),
+                "table_headers": slide.get("table_headers", []),
+                "table_rows": slide.get("table_rows", []),
                 "source_block_ids": ids,
                 "source_sections": sorted(
                     {str(b.get("section")) for b in source_blocks if b.get("section")}
@@ -347,7 +385,7 @@ def _normalize_manifest(
         )
 
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "video_id": lesson["id"],
         "title": generated.get("lesson_title") or lesson["title"],
         "focus": lesson["focus"],
@@ -364,7 +402,7 @@ def _normalize_manifest(
         "source_reference_block_count": len(refs),
         "source_core_blocks": [b["id"] for b in core],
         "source_reference_blocks": [b["id"] for b in refs],
-        "editorial_status": "llm_draft_requires_review",
+        "editorial_status": "automated_ready",
         "editorial_flags": generated.get("editorial_flags", []),
         "generation": {
             "mode": "llm",
@@ -408,11 +446,8 @@ def build_lesson_manifest_with_llm(
             f"{max_chars:,}; it will not be truncated silently."
         )
 
-    is_textbook = (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
-    max_slides = int(lesson.get("max_slides", course.get("max_slides", 7)))
-    if is_textbook:
-        max_slides = max(5, max_slides)
-    schema = lesson_manifest_schema(max_slides, min_slides=5 if is_textbook else 4)
+    max_slides = max(5, int(lesson.get("max_slides", course.get("max_slides", 7))))
+    schema = lesson_manifest_schema(max_slides, min_slides=5)
     context = _prompt_context(extraction, course, lesson, core, refs, global_plan)
     design_mode = "global_llm" if global_plan else "profile"
 
@@ -447,13 +482,12 @@ def build_lesson_manifest_with_llm(
     if _narration_polish_enabled(course):
         manifest = polish_lesson_narration(manifest, context, provider)
 
-    if is_textbook:
-        final_errors = [item for item in validate_manifest(manifest) if item.get("severity") == "error"]
-        if final_errors:
-            raise LLMError(
-                "Textbook-subchapter lesson failed mandatory slide-stack validation after review: "
-                f"{final_errors}"
-            )
+    final_errors = [item for item in validate_manifest(manifest) if item.get("severity") == "error"]
+    if final_errors:
+        raise LLMError(
+            "Generated self-learning lesson failed mandatory automated validation after review: "
+            f"{final_errors}"
+        )
     return manifest
 
 
@@ -468,11 +502,8 @@ def _revise_for_course_consistency(
 ) -> dict:
     core, refs = _lesson_source_blocks(extraction, lesson)
     context = _prompt_context(extraction, course, lesson, core, refs, global_plan)
-    is_textbook = (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
-    max_slides = int(lesson.get("max_slides", course.get("max_slides", 7)))
-    if is_textbook:
-        max_slides = max(5, max_slides)
-    schema = lesson_manifest_schema(max_slides, min_slides=5 if is_textbook else 4)
+    max_slides = max(5, int(lesson.get("max_slides", course.get("max_slides", 7))))
+    schema = lesson_manifest_schema(max_slides, min_slides=5)
     revised = provider.generate_json(
         _compose_consistency_revision_prompt(context, manifest, instructions), schema
     )
@@ -490,13 +521,12 @@ def _revise_for_course_consistency(
     )
     if _narration_polish_enabled(course):
         revised_manifest = polish_lesson_narration(revised_manifest, context, provider)
-    if is_textbook:
-        final_errors = [item for item in validate_manifest(revised_manifest) if item.get("severity") == "error"]
-        if final_errors:
-            raise LLMError(
-                "Textbook-subchapter lesson lost its mandatory slide architecture during course-level revision: "
-                f"{final_errors}"
-            )
+    final_errors = [item for item in validate_manifest(revised_manifest) if item.get("severity") == "error"]
+    if final_errors:
+        raise LLMError(
+            "Course-level revision produced a lesson that failed mandatory automated validation: "
+            f"{final_errors}"
+        )
     return revised_manifest
 
 
