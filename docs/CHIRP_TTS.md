@@ -11,7 +11,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.8
+  speaking_rate: 1.2
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi

@@ -7,6 +7,87 @@ from pathlib import Path
 import yaml
 
 
+def _visible_slide_strings(slide: dict) -> list[str]:
+    values = [str(slide.get("title", ""))]
+    values.extend(str(value) for value in slide.get("onscreen", []) or [])
+    for panel in slide.get("visual_panels", []) or []:
+        values.append(str(panel.get("heading", "")))
+        values.extend(str(value) for value in panel.get("body", []) or [])
+    values.extend(str(value) for value in slide.get("table_headers", []) or [])
+    for row in slide.get("table_rows", []) or []:
+        values.extend(str(value) for value in row)
+    return [value.strip() for value in values if value.strip()]
+
+
+def validate_slide_surface(slide: dict) -> list[dict]:
+    """Return blocking issues that could make a rendered slide unreadable."""
+    slide_id = slide.get("id")
+    issues: list[dict] = []
+    visual_type = str(slide.get("visual_type", "auto") or "auto")
+    onscreen = [
+        str(value).strip()
+        for value in slide.get("onscreen", []) or []
+        if str(value).strip()
+    ]
+    onscreen_chars = len(" ".join(onscreen))
+    has_rich_visual = bool(
+        slide.get("visual_panels")
+        or slide.get("table_rows")
+        or slide.get("figure_ids")
+        or slide.get("equation_latex")
+        or visual_type in {"process", "comparison", "diagram", "table", "figure", "equation_focus"}
+    )
+    line_limit, char_limit = (2, 140) if has_rich_visual else (4, 260)
+    if len(onscreen) > line_limit or onscreen_chars > char_limit:
+        issues.append({
+            "severity": "error",
+            "slide": slide_id,
+            "message": (
+                "On-screen lead text exceeds the safe layout budget "
+                f"({len(onscreen)}/{line_limit} entries, {onscreen_chars}/{char_limit} characters)."
+            ),
+        })
+    visible_text = " ".join(_visible_slide_strings(slide))
+    if re.search(r"\$[^$]+\$|\\(?:frac|sqrt|sum|begin|mathrm|left|right)\b", visible_text):
+        issues.append({
+            "severity": "error",
+            "slide": slide_id,
+            "message": "Visible text contains raw TeX/LaTeX; use equation_latex or compact renderer-convertible notation.",
+        })
+    for panel_index, panel in enumerate(slide.get("visual_panels", []) or [], start=1):
+        heading = str(panel.get("heading", "")).strip()
+        body = [
+            str(value).strip()
+            for value in panel.get("body", []) or []
+            if str(value).strip()
+        ]
+        body_chars = len(" ".join(body))
+        if len(heading.split()) > 7 or len(body) > 3 or body_chars > 160:
+            issues.append({
+                "severity": "error",
+                "slide": slide_id,
+                "message": (
+                    f"Visual panel {panel_index} exceeds the safe layout budget "
+                    f"({len(heading.split())}/7 heading words, {len(body)}/3 body entries, "
+                    f"{body_chars}/160 body characters)."
+                ),
+            })
+    table_headers = slide.get("table_headers", []) or []
+    table_rows = slide.get("table_rows", []) or []
+    longest_cell = max((len(str(value)) for row in table_rows for value in row), default=0)
+    if len(table_headers) > 5 or len(table_rows) > 8 or longest_cell > 100:
+        issues.append({
+            "severity": "error",
+            "slide": slide_id,
+            "message": (
+                "Table exceeds the safe layout budget "
+                f"({len(table_headers)}/5 columns, {len(table_rows)}/8 rows, "
+                f"{longest_cell}/100 characters in the longest cell)."
+            ),
+        })
+    return issues
+
+
 def validate_manifest(m: dict) -> list[dict]:
     issues: list[dict] = []
     slides = m.get("slides", [])
@@ -23,7 +104,9 @@ def validate_manifest(m: dict) -> list[dict]:
         )
 
     source_slides = [
-        s for s in slides if s.get("slide_type") in {"concept", "worked_example"}
+        s
+        for s in slides
+        if s.get("slide_type") in {"concept", "worked_example", "method", "interpretation"}
     ]
     if not source_slides:
         issues.append(
@@ -52,14 +135,30 @@ def validate_manifest(m: dict) -> list[dict]:
     if not any(s.get("slide_type") == "check" for s in slides):
         issues.append({"severity": "error", "message": "No check-your-understanding slide."})
 
-    if m.get("source_document_type") == "textbook_subchapter":
+    textbook = m.get("source_document_type") == "textbook_subchapter"
+    is_llm = (m.get("generation") or {}).get("mode") == "llm"
+    if is_llm and not textbook:
+        if len(slides) < 5:
+            issues.append({"severity": "error", "message": "Self-learning LLM lesson requires at least five slides."})
+        if slides and slides[0].get("slide_type") != "introduction":
+            issues.append({"severity": "error", "message": "Self-learning LLM lesson must begin with an introduction slide."})
+        if slides and slides[-1].get("slide_type") != "conclusion":
+            issues.append({"severity": "error", "message": "Self-learning LLM lesson must end with a conclusion slide."})
+
+    if textbook:
         if len(slides) < 5:
             issues.append({"severity": "error", "message": "Textbook subchapter requires at least five slides."})
         if not slides or slides[0].get("slide_type") != "title":
             issues.append({"severity": "error", "message": "Textbook subchapter must begin with a title slide."})
         if slides and str(slides[0].get("title", "")).strip() != str(m.get("title", "")).strip():
             issues.append({"severity": "error", "message": "Textbook title slide must use the exact lesson title."})
-        if slides and (slides[0].get("onscreen") or slides[0].get("figure_ids")):
+        if slides and (
+            slides[0].get("onscreen")
+            or slides[0].get("figure_ids")
+            or slides[0].get("visual_panels")
+            or slides[0].get("table_headers")
+            or slides[0].get("table_rows")
+        ):
             issues.append({"severity": "error", "message": "Textbook title slide must contain only the exact title."})
         if len(slides) < 2 or slides[1].get("slide_type") != "introduction":
             issues.append({"severity": "error", "message": "Textbook subchapter must include an introduction slide immediately after the title."})
@@ -71,14 +170,13 @@ def validate_manifest(m: dict) -> list[dict]:
             issues.append({"severity": "error", "message": "Relevant textbook figure assets are available but none are used in the lesson."})
     if len(slides) > 9:
         issues.append({"severity": "warning", "message": f"High slide count: {len(slides)}."})
-    textbook = m.get("source_document_type") == "textbook_subchapter"
     valid_figure_ids = {str(item.get("id")) for item in m.get("figure_assets", []) or []}
     for s in slides:
         if not s.get("narration"):
             issues.append(
                 {"severity": "error", "slide": s.get("id"), "message": "Missing narration."}
             )
-        if s.get("slide_type") in {"concept", "worked_example"} and not s.get(
+        if s.get("slide_type") in {"concept", "worked_example", "method", "interpretation"} and not s.get(
             "source_block_ids"
         ):
             issues.append(
@@ -88,7 +186,7 @@ def validate_manifest(m: dict) -> list[dict]:
                     "message": "Source-derived slide lacks provenance.",
                 }
             )
-        if len(" ".join(s.get("onscreen", []))) > 420:
+        if len(" ".join(s.get("onscreen", []))) > 320:
             issues.append(
                 {
                     "severity": "warning",
@@ -96,6 +194,15 @@ def validate_manifest(m: dict) -> list[dict]:
                     "message": "On-screen text is dense.",
                 }
             )
+        visual_type = str(s.get("visual_type", "auto") or "auto")
+        issues.extend(validate_slide_surface(s))
+        if visual_type in {"process", "comparison", "diagram"} and not s.get("visual_panels"):
+            issues.append({"severity": "warning", "slide": s.get("id"), "message": f"Visual type '{visual_type}' has no visual panels."})
+        if visual_type == "table" and (not s.get("table_headers") or not s.get("table_rows")):
+            issues.append({"severity": "warning", "slide": s.get("id"), "message": "Table visual lacks table headers or rows."})
+        narration = str(s.get("narration", ""))
+        if is_llm and re.search(r"\\[A-Za-z]+|\$|\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[^,.!?;]+", narration):
+            issues.append({"severity": "error", "slide": s.get("id"), "message": "Narration contains symbolic/TeX mathematics instead of plain spoken English."})
         if textbook:
             visible = " ".join(str(x) for x in s.get("onscreen", []))
             narration = str(s.get("narration", ""))
@@ -108,6 +215,19 @@ def validate_manifest(m: dict) -> list[dict]:
                 issues.append({"severity": "error", "slide": s.get("id"), "message": "Textbook slide exposes a counter, citation marker, or source artefact."})
             if re.search(r"\\[A-Za-z]+|\$|[₀-₉]|[⁰¹²³⁴⁵⁶⁷⁸⁹]|[±×÷√∑Σ]|\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[^,.!?;]+", narration):
                 issues.append({"severity": "error", "slide": s.get("id"), "message": "Textbook narration contains symbolic/TeX mathematics instead of plain spoken English."})
+    if is_llm and len(slides) >= 5:
+        middle = slides[1:-1] if len(slides) > 2 else slides
+        plain = [
+            slide
+            for slide in middle
+            if str(slide.get("visual_type", "auto") or "auto") in {"auto", "text"}
+            and not slide.get("visual_panels")
+            and not slide.get("table_rows")
+            and not slide.get("figure_ids")
+            and not slide.get("equation_latex")
+        ]
+        if middle and len(plain) >= max(3, int(len(middle) * 0.75)):
+            issues.append({"severity": "warning", "message": "Most substantive slides use plain text; consider source-grounded process/comparison/table/diagram/equation/figure visuals."})
     return issues
 
 

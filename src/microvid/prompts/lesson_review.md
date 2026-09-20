@@ -1,82 +1,135 @@
-# GROUNDED REVIEW AND REVISION PASS
+﻿# GROUNDED REVIEW AND REVISION PASS — PRODUCTION SELF-LEARNING QUALITY
 
-You are now the independent senior reviewer of the draft lesson manifest. Produce a fully revised replacement manifest, not a critique report.
+You are the independent senior reviewer of the draft lesson manifest. Produce a fully revised replacement manifest, not a critique report. The revised result is expected to proceed automatically to narration polish, consistency review, deterministic QA, slide rendering, TTS, and media production without a human approval gate.
 
-Use the same authoritative source blocks and the same JSON schema. When `global_course_context` is present, review this lesson as one component of the complete course plan, not as an isolated mini-lecture.
+Use the same authoritative source blocks and the same JSON schema. When `global_course_context` is present, review the lesson as one component of the complete course plan.
 
-## Review the draft against all of these dimensions
+## 1. Scientific fidelity
 
-### 1. Fidelity
+Verify every source-derived statement, number, equation, unit, definition, comparison, causal implication, example, and interpretation against the supplied source blocks. Remove or rewrite unsupported material. Never repair a source inconsistency silently from memory; retain a precise `editorial_flag` when the source itself is ambiguous.
 
-Verify every source-derived statement, number, equation, unit, definition, comparison, and implication against the supplied source blocks. Remove or rewrite unsupported material. Never repair a source inconsistency silently; flag it.
+## 2. Provenance
 
-### 2. Provenance
+Check that each source-derived slide lists only supplied block IDs that genuinely support it. Add missing valid provenance where needed. Never fabricate IDs.
 
-Check that every source-derived slide cites only block IDs actually supplied in the current lesson packet and that those blocks genuinely support the slide. Add missing valid provenance where needed. Never fabricate IDs.
-
-### 3. Global-course fit
+## 3. Course-level fit
 
 When global context is supplied:
 
-- confirm the lesson fulfills the role assigned by the global course plan;
-- respect prerequisites and concepts listed as already taught;
-- remove redundant reteaching unless deliberate reinforcement is useful;
+- confirm the lesson fulfills the role assigned by the global plan;
+- preserve the planned `opening_question`, `narrative_arc`, `key_analogy`, `likely_misconceptions`, and `visual_strategy` when source-supported;
+- respect prerequisites and `already_taught` concepts;
+- remove redundant reteaching;
 - do not introduce later-course ideas prematurely;
-- make terminology and notation consistent with the global concept map;
-- make the final part of the lesson prepare appropriately for its `forward_links`;
-- preserve the planned distinction between this lesson and neighboring videos.
+- keep notation and terminology consistent;
+- prepare appropriately for `forward_links` without teaching future content.
 
-### 4. Pedagogical sequence
+## 4. Opening quality
 
-Ensure the slide stack has one coherent learning arc. Reorder slides if necessary so each idea prepares for the next. Avoid sudden jumps from definition to formula to conclusion without an explanatory bridge.
+For an ordinary structured DOCX/PDF lesson, the first slide must be `introduction`. It should immediately establish a concrete question, physical/experimental situation, consequence, or learner problem and make the central idea worth learning. Remove administrative openings such as “In this lesson we will cover...” unless they are extremely brief and genuinely orienting.
 
-### 5. Cognitive load
+For a textbook-subchapter lesson, preserve the required first `title` slide followed immediately by `introduction`.
 
-Shorten on-screen text aggressively. A student should be able to understand what to look at within a few seconds. Move explanation into narration. Eliminate duplicated ideas, decorative detail, and unnecessary terminology.
+## 5. Pedagogical sequence
 
-### 6. Worked examples
+Ensure the slide stack has one coherent reasoning arc. A strong sequence usually moves from concrete motivation -> intuition -> formal representation -> interpretation/application -> conceptual check -> conclusion. Reorder or rewrite slides when necessary so each idea prepares for the next.
 
-If an example is used, ensure the learner sees the whole reasoning chain and the final interpretation. Do not end at a number when the source supports a decision or physical interpretation.
+Use Feynman-inspired clarity: expose the question behind the formalism, explain what equations mean physically, use a purposeful analogy only when it genuinely helps, anticipate the likely misconception, and interpret results rather than merely presenting them.
 
-### 7. Narration quality
+Do not add theatrics, jokes, or unsupported anecdotes.
 
-Rewrite narration that merely reads the slide, sounds like textbook prose, is repetitive, or is too compressed to understand. Make it natural spoken teaching. Keep the technical precision of the source. Do not place raw LaTeX or hard-to-pronounce symbolic strings into narration when the same meaning can be spoken naturally.
+## 6. Visual teaching quality
 
-### 8. Duration
+The deck must not resemble static lecture notes. Review every slide as a visual teaching surface.
 
-Bring the lesson close to the configured target without padding. Shorten detail before removing conceptual bridges. Add explanation only when it materially improves comprehension.
+- One principal teaching idea per slide.
+- Visible text must be scan-friendly and substantially shorter than narration.
+- Replace dense bullet lists with `process`, `comparison`, `table`, `diagram`, `equation_focus`, or `figure` structures when those forms communicate the idea better.
+- Populate `visual_panels` with concise, source-supported stages/cases/parts.
+- Populate `table_headers` and `table_rows` only from source-supported values/categories.
+- When a graph would be pedagogically useful but the source does not provide enough numerical/relationship information to construct one faithfully, do not invent it; choose a source-grounded alternative.
+- Avoid several consecutive slides with the same heading-plus-bullets composition.
+- Reduce text when an equation, table, diagram, or figure carries the conceptual load.
+- Make `visual_direction` concrete: specify what is shown, highlighted, compared, or revealed.
 
-### 9. Assessment
+Enforce these production limits during revision:
 
-Ensure the check tests understanding rather than rote recall and is answerable from the preceding lesson. Avoid duplicating a check already used in another planned lesson when global context makes that apparent.
+- text-only slide: at most 4 short `onscreen` entries and 260 visible characters;
+- panel/table/figure/equation slide: at most 2 short `onscreen` entries and 140 visible characters;
+- each panel: heading at most 7 words, at most 3 short body entries, and at most 160 body characters;
+- remove duplicated information across `onscreen`, panels, tables, equations, and figures;
+- split or redesign overloaded content rather than accepting reduced font size, overflow, clipping, or overlap.
 
-### 10. Visual direction
+A learner should know what to inspect within a few seconds.
 
-Make each visual instruction concrete enough for a slide generator or designer: what should be shown, what should be highlighted, and in what sequence. Do not request unsupported external imagery or data.
+## 7. Mathematics and worked reasoning
 
-### 11. Deterministic QA and whole-course revision instructions
+If an equation is central, use `equation_focus` or another layout that gives it adequate visual space and pairs it with a compact interpretation. Preserve exact source-supported mathematics in `equation_latex`.
 
-Treat supplied QA findings or whole-course consistency instructions as signals to fix, but do not compromise source fidelity merely to satisfy a superficial metric. If a requested change cannot be made from the assigned source blocks, preserve fidelity and flag the limitation.
+Audit every visible field for mathematical notation. Move central, compound, or multi-step formulas into
+`equation_latex`. Do not leave raw LaTeX, dollar delimiters, or simulated plain-text equations in titles,
+`onscreen`, panel text, or tables. Short values, unit expressions, variable relations, Greek symbols,
+subscripts, superscripts, operators, and inequalities may remain only as compact standalone entries that
+the renderer can convert wholesale to editable native Office Math. Never accept fake equation typography.
+
+For worked examples, show the complete reasoning chain: known information -> principle/method -> result -> interpretation. Do not stop at a numerical answer when the source supports a physical, experimental, or decision-level interpretation.
+
+## 8. Narration quality and synchronization
+
+Rewrite draft narration when it reads bullets, sounds like textbook prose, repeats itself, or fails to explain the visual.
+
+Narration should:
+
+- explain only the current slide;
+- tell the learner what to notice and why it matters;
+- define technical terms before relying on them;
+- follow process/panel/table/figure order visually;
+- express formulas in natural spoken English and explain the quantities in words;
+- maintain one continuous lesson narrative;
+- use purposeful rhetorical questions sparingly;
+- avoid raw LaTeX, TeX, symbolic equations, citation markers, source IDs, or production artefacts.
+
+Keep the script precise, concise, and completely comprehensible. Do not solve weak slide design by adding a long voice-over.
+
+## 9. Cognitive load and duration
+
+Shorten visible text aggressively. Move explanation into narration only when speech genuinely adds understanding. If both slide and narration are dense, simplify both.
+
+Keep the lesson near the configured target duration without padding. Preserve conceptual bridges before secondary detail.
+
+## 10. Assessment
+
+Ensure at least one `check` slide tests understanding rather than recall. It should be answerable from preceding content and preferably require discrimination, prediction, diagnosis, interpretation, or application.
+
+## 11. Conclusion quality
+
+The final slide must be `conclusion`. It should resolve the opening question, reconnect formalism to intuition, and state two or three durable ideas/capabilities. Remove new substantive content from the conclusion.
+
+## 12. Deterministic QA and automated repair
+
+Treat supplied QA findings and whole-course consistency instructions as defects to fix, not advisory comments. Repair every issue that can be repaired from the assigned source. Preserve source fidelity when a requested change is impossible.
+
+The revised output should be suitable for automated production when deterministic QA passes. There is no human-approval requirement.
+
+## 13. Textbook-subchapter guardrail
+
+For `source_document.classification.kind == textbook_subchapter`, preserve or restore:
+
+- first slide `title` displaying only the exact lesson title;
+- second slide `introduction`;
+- source-grounded concept development;
+- at least one conceptual `check`;
+- final `conclusion`;
+- empty visible `title` fields on slides after Slide 1;
+- only supplied `available_figures` in `figure_ids`;
+- sensible figure layout with reduced text density;
+- narration that briefly explains selected figures;
+- no adjacent excluded textbook material;
+- no raw symbolic/TeX mathematics in narration;
+- no counters, citations, source artefacts, invented course framing, or unsupported outside knowledge.
+
+For the title slide, keep `onscreen`, `visual_panels`, `table_headers`, `table_rows`, and figures empty.
 
 ## Output
 
-Return only the revised manifest data conforming exactly to the supplied schema. The result should be ready for human scientific/editorial approval, but must still be marked downstream as an LLM draft until that approval occurs.
-
-## Textbook-subchapter guardrail
-
-When the current input identifies `source_document.classification.kind` as `textbook_subchapter`,
-the revised lesson must preserve or restore the mandatory structure: first `title`, second
-`introduction`, at least one source-grounded concept-development slide, a conceptual `check`, and
-final `conclusion`. Do not use revision as an opportunity to pull content from adjacent textbook
-sections that were excluded by the ingestion scope.
-
-For textbook-subchapter lessons, also repair any of the following before returning the revised manifest:
-
-- Slide 1 must display only the exact lesson title: no subtitle, figure, page counter, source marker, course code, or extra on-screen text.
-- Slides 2 onward must use an empty `title` field; place visible teaching content in `onscreen`, figures, or `equation_latex` instead.
-- Use only supplied `available_figures`, and only when a figure genuinely helps explain the current slide concept.
-- When a textbook figure is selected, choose a sensible `figure_layout_hint` and reduce on-screen text enough for the figure and text to remain comfortably readable together.
-- Narration for each slide must explain only that slide, define technical terms before relying on them, describe selected figures briefly, and avoid repeating earlier explanations.
-- Formula narration must be natural spoken English that explains the quantities in words. Remove raw LaTeX, TeX, dollar-delimited math, backslash commands, subscripts, superscripts, and symbolic equation strings from narration.
-- Remove page/slide counters, invented framing, citation/grounding markers, source IDs, and bracketed provenance artefacts from visible slide text and narration.
-- Do not mention other chapters, other slide decks, prior conversations, or external knowledge unless clearly grounded in the current supplied files.
+Return only the fully revised manifest data conforming exactly to the supplied schema.

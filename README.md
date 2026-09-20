@@ -83,6 +83,12 @@ estimated_seconds * narration_wpm / 60
 
 This leaves room for visual attention and pauses. The final manifest records `narration_word_count`, `narration_estimated_spoken_seconds`, optional `tts_text`, and narration-quality findings. See [NARRATION_QUALITY.md](docs/NARRATION_QUALITY.md).
 
+## Self-learning slide architecture
+
+LLM-generated lessons are designed as visual self-learning microlectures rather than projected notes. Ordinary structured DOCX/PDF lessons begin with a motivating `introduction`, develop the concept through source-grounded visual forms, include a reasoning `check`, and end with a synthesizing `conclusion`. Textbook-subchapter lessons retain the stricter `title -> introduction -> development -> check -> conclusion` structure.
+
+The lesson schema lets Gemini choose `process`, `comparison`, `table`, `diagram`, `equation_focus`, or supplied `figure` layouts in addition to concise text. The PowerPoint renderer implements these structures with native cards, arrows, tables, equations, adaptive figure placement, and dynamic title sizing. Learner-facing slides do not display internal provenance footers; provenance remains in the manifest and speaker notes.
+
 ## Normal first run
 
 ```powershell
@@ -103,7 +109,7 @@ microvid all `
   --profile physics_lab_101
 ```
 
-PDF input is native; conversion to DOCX is not required. Image-only/scanned PDFs are rejected visibly rather than silently OCRed. PDF page numbers are retained only as provenance metadata; lesson segmentation remains semantic rather than page-based. Embedded figures are not yet supplied to Gemini as multimodal inputs.
+PDF input is native; conversion to DOCX is not required. Image-only/scanned PDFs are rejected visibly rather than silently OCRed. PDF page numbers are retained only as provenance metadata; lesson segmentation remains semantic rather than page-based. For detected textbook-subchapter PDFs, relevant captioned source figures are extracted locally and exposed to Gemini as source-grounded figure assets/metadata so they can be selected and placed in the deck. Gemini is not asked to invent substitute imagery.
 
 For a staged workflow:
 
@@ -200,7 +206,7 @@ tts:
   voice_name: en-US-Chirp-HD-F
   ssml_gender: FEMALE
   audio_encoding: LINEAR16
-  speaking_rate: 0.8
+  speaking_rate: 1.2
   location: global
   normalize_scientific_speech: true
   fallback_provider: sapi
@@ -260,23 +266,17 @@ for TTS cannot authorize personal YouTube uploads. See
 [YouTube course publishing](docs/YOUTUBE_PUBLISHING.md) for setup, preview, resume, and
 YouTube Course conversion details.
 
-## Editorial gates
+## Automated production gates
 
-Global Gemini consistency review happens before slide production. If blocking cross-course issues remain after the allowed targeted revision pass, draft manifests and review files are saved but slide generation is blocked.
+There is no human-approval flag in the normal production path. Gemini generation is followed by a grounded lesson revision pass, dedicated narration polish, whole-course consistency review with targeted revision when needed, and deterministic manifest/workspace validation. Blocking automated QA errors stop slide/media production until they are repaired.
 
-Individual lesson manifests still begin with:
-
-```yaml
-editorial_status: llm_draft_requires_review
-```
-
-Human scientific/editorial approval remains required before final media production:
+Generated manifests use:
 
 ```yaml
-editorial_status: approved
+editorial_status: automated_ready
 ```
 
-For narration specifically, audition representative lessons with the actual TTS voice before approving the full course. A polished LLM script remains subject to human judgment about scientific nuance, pace and teaching style.
+`microvid media` renders a generated lesson directly; `--allow-draft` and `editorial_status: approved` are no longer required. Source ambiguity is still handled conservatively: for example, an ambiguous textbook-subchapter boundary fails visibly rather than being guessed.
 
 ## Installation
 

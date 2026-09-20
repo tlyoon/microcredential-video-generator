@@ -232,7 +232,7 @@ def build_lesson_manifest(extraction: dict, course: dict, lesson: dict) -> dict:
         "source_core_block_count": len(core),
         "source_reference_block_count": len(refs),
         "source_reference_blocks": [b["id"] for b in refs],
-        "editorial_status": "draft_requires_review",
+        "editorial_status": "automated_ready",
         "slides": [s.to_dict() for s in slides],
     }
 

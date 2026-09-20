@@ -171,7 +171,7 @@ def scope_textbook_subchapter(extraction: dict) -> dict:
         result["textbook_subchapter_ingestion"] = {
             "applied": False,
             "reason": "Textbook-like PDF detected, but no reliable numbered subchapter boundary was found.",
-            "requires_review": True,
+            "boundary_ambiguous": True,
         }
         return result
 
@@ -183,7 +183,7 @@ def scope_textbook_subchapter(extraction: dict) -> dict:
             result["textbook_subchapter_ingestion"] = {
                 "applied": False,
                 "reason": "Only one numbered subsection heading was found near the end of a larger preceding text region; the intended boundary is ambiguous.",
-                "requires_review": True,
+                "boundary_ambiguous": True,
             }
             return result
     target_ratio = float(target["chars"]) / total_chars

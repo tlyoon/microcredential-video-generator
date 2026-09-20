@@ -183,7 +183,8 @@ Each generated slide binds together:
 - concise on-screen content;
 - polished natural narration;
 - lecturer notes;
-- visual/build direction;
+- visual/build direction plus a structured visual type (`process`, `comparison`, `table`, `diagram`, `equation_focus`, `figure`, or concise text);
+- optional visual panels or source-grounded table data;
 - optional exact LaTeX;
 - source block IDs;
 - estimated timing;
@@ -207,7 +208,7 @@ PNG + audio -> FFmpeg segment
 segments -> final MP4
 ```
 
-Human scientific/editorial approval remains a separate gate. Final media rendering is blocked unless the lesson manifest is `editorial_status: approved`, except when `--allow-draft` is deliberately used for a private preview.
+Human approval is not a production gate. Generated lessons pass through grounded revision, narration polish, whole-course consistency review, and deterministic QA. Blocking automated findings stop the normal pipeline; once those checks pass, `microvid media` can render the lesson directly.
 
 ## Large-document boundary
 

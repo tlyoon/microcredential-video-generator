@@ -31,7 +31,7 @@ def _extract_source_with_raw(
         raw = extract_pdf(source, parser_config=parser_config)
         payload = prepare_pdf_extraction(raw)
         scope = payload.get("textbook_subchapter_ingestion") or {}
-        if (payload.get("source_classification") or {}).get("kind") == "textbook_subchapter" and scope.get("requires_review"):
+        if (payload.get("source_classification") or {}).get("kind") == "textbook_subchapter" and scope.get("boundary_ambiguous"):
             raise ValueError(
                 "Textbook-like PDF detected, but the intended subchapter boundary could not be determined safely: "
                 f"{scope.get('reason')}. Provide a cleaner subchapter cut before video generation."

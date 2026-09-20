@@ -9,6 +9,7 @@ from pathlib import Path
 
 import yaml
 
+from .qa import validate_manifest
 from .speech import normalize_scientific_speech
 from .tts import TTSConfig, provider_from_tts_config
 
@@ -192,7 +193,6 @@ def _tts_text(slide: dict, config: TTSConfig) -> str:
 def build_windows_video(
     workspace: str | Path,
     video_id: str,
-    allow_draft: bool = False,
     tts_config: dict | TTSConfig | None = None,
 ) -> Path:
     workspace = Path(workspace)
@@ -202,12 +202,11 @@ def build_windows_video(
     if not manifest_path.exists() or not deck.exists():
         raise RuntimeError("Manifest/deck missing. Run extract, draft and slides first.")
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if manifest.get("editorial_status") != "approved" and not allow_draft:
+    blocking = [item for item in validate_manifest(manifest) if item.get("severity") == "error"]
+    if blocking:
         raise RuntimeError(
-            "Media generation is blocked because the lesson manifest is not editorial_status: approved. "
-            "Review source provenance, equations, narration and timing first, or use --allow-draft only for a private preview."
+            "Media generation is blocked by automated lesson QA: " + str(blocking)
         )
-
     cfg = tts_config if isinstance(tts_config, TTSConfig) else TTSConfig.from_mapping(tts_config)
     tts_provider = provider_from_tts_config(cfg)
 

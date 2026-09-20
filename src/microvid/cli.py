@@ -16,7 +16,7 @@ from .llm_manifest_builder import build_all_manifests_with_llm
 from .manifest_builder import build_all_manifests
 from .media import audition_voices, build_windows_video, media_capabilities
 from .profile import load_profile
-from .qa import validate_workspace
+from .qa import validate_manifest, validate_workspace
 from .runtime_config import load_local_runtime_environment
 from .slides import build_pptx
 from .source_parser import write_extraction
@@ -247,6 +247,16 @@ def cmd_slides(args) -> int:
     if not paths:
         raise SystemExit("No lesson manifests found. Run 'microvid draft' first.")
     for path in paths:
+        manifest = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        blocking = [issue for issue in validate_manifest(manifest) if issue.get("severity") == "error"]
+        if blocking:
+            details = "; ".join(
+                f"{issue.get('slide', 'course')}: {issue.get('message', 'validation error')}"
+                for issue in blocking
+            )
+            raise SystemExit(
+                f"Slide production is blocked for {path.name}; repair the manifest first. {details}"
+            )
         num = int(path.stem.split("_")[1])
         out = workspace / "slides" / f"video_{num:02d}.pptx"
         build_pptx(path, out)
@@ -289,7 +299,6 @@ def cmd_media(args) -> int:
     output = build_windows_video(
         args.workspace,
         args.video,
-        allow_draft=args.allow_draft,
         tts_config=cfg,
     )
     print(f"Built {output} using TTS provider {cfg.provider}, voice {cfg.voice_name}")
@@ -516,10 +525,9 @@ def parser() -> argparse.ArgumentParser:
     m = sp.add_parser("media-check", help="Report local media-production capabilities")
     m.set_defaults(func=cmd_media_check)
 
-    mv = sp.add_parser("media", help="Render an approved lesson to MP4 on Windows using PowerPoint + configurable TTS + ffmpeg")
+    mv = sp.add_parser("media", help="Render a generated lesson to MP4 on Windows using PowerPoint + configurable TTS + ffmpeg")
     mv.add_argument("--workspace", required=True)
     mv.add_argument("--video", required=True, help="Video id, e.g. V05")
-    mv.add_argument("--allow-draft", action="store_true", help="Allow private preview rendering before editorial approval")
     _add_tts_options(mv)
     mv.set_defaults(func=cmd_media)
 
