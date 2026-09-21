@@ -4,6 +4,12 @@ All notable project changes are summarized here.
 
 ## Unreleased
 
+- Added a dedicated course trailer / Video 00 operating guide and packaged reusable trailer
+  editorial prompt.
+- Documented the current lesson-only YouTube publisher boundary so trailer files do not break
+  manifest/count validation, plus the safe separate upload and playlist-ordering workflow.
+- Expanded the user manual with an operator quick start, explicit LLM prompt map, Gemini moving
+  alias guidance, YouTube publishing workflow, and OAuth/trailer troubleshooting.
 - Added a plug-and-play YouTube course publishing workflow with public-by-default uploads.
 - Added automatic completed-workspace discovery, template-informed Gemini metadata, a generated square course image, resumable video uploads, ordered playlist creation and reconciliation, and SRT caption uploads.
 - Added persistent per-course publishing state so interrupted or repeated commands resume without knowingly duplicating uploaded videos.
