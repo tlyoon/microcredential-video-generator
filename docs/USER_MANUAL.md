@@ -13,6 +13,33 @@ publisher discovers completed courses under `workspace\`, produces original meta
 course image, uploads the MP4/SRT set, creates the ordered playlist, and defaults to public
 visibility.
 
+## Operator quick start
+
+For a normal new course, use this sequence:
+
+1. Install the package with `.[dev,windows]` and confirm `microvid --help` works.
+2. Put `GEMINI_API_KEY` in `%LOCALAPPDATA%\Microvid\.env`.
+3. Configure Google Cloud TTS credentials and audition the chosen voice.
+4. Create or review a course profile; pin a concrete Gemini model when reproducibility matters.
+5. Run `extract`, `plan`, `draft`, `slides`, and `validate` once as separate stages.
+6. Render one representative lesson with `media`, inspect it, then render the remaining lessons.
+7. Run `microvid youtube publish --dry-run`, review the metadata and course image, then publish.
+8. If a Video 00 trailer is required, follow [COURSE_TRAILER.md](COURSE_TRAILER.md) and keep it
+   outside the lesson `videos` directory during automated publishing.
+
+The shortest production command after the setup is understood is:
+
+```powershell
+microvid all `
+  --source .\source\my_course.pdf `
+  --workspace .\workspace\my_course `
+  --profile .\profiles\my_course.yaml
+```
+
+`microvid all` creates plans, manifests and slides, but it does not render every lesson MP4 or
+publish to YouTube. Run `microvid media` for each lesson and `microvid youtube publish`
+separately.
+
 ---
 
 ## 1. Production philosophy
@@ -263,6 +290,19 @@ The model is configuration data. You may override it at runtime:
 ```
 
 For reproducible production runs, pin an exact supported model instead of a moving alias.
+
+`gemini-flash-latest` does not name one permanently fixed model. It is a Google-managed alias
+that can move to a newer Flash release. That makes it useful when you want current behavior,
+but two runs made at different times may not use the same underlying model. For repeatable
+production or regression comparisons:
+
+1. choose a concrete model ID that is available to your Gemini account;
+2. set it in `course.llm.model` or pass `--model` where that command supports the option;
+3. retain the generated plan/manifests, which record model provenance;
+4. change the pinned ID deliberately after reviewing release behavior.
+
+The package uses the official `google-genai` SDK. Model availability is controlled by the
+Gemini service and the credentials in use, not by Microvid itself.
 
 ---
 
@@ -542,6 +582,30 @@ workspace/my_course/
 
 The global plan is the course-level design contract. Each `video_NN.yaml` is the production record for one lesson.
 
+### 14.1 Version-controlled instruction prompts
+
+The package ships its LLM instructions under `src/microvid/prompts/`. These files are part of
+the installed package, so prompt edits are code-package changes and should be reviewed,
+tested, committed, and released like Python changes.
+
+The prompts that directly control lesson slides and narration are:
+
+| Prompt file | Purpose | Used automatically? |
+| --- | --- | --- |
+| `system_microcredential_architect.md` | Shared source-fidelity, pedagogy, slide, visual, narration and output rules | Yes |
+| `lesson_generation.md` | Creates each lesson's slide stack and first narration | Yes |
+| `lesson_review.md` | Reviews and revises scientific and pedagogical quality | Yes |
+| `narration_polish.md` | Rewrites only the spoken narration/optional `tts_text` after the slide design is fixed | Yes |
+| `global_course_planning.md` | Designs the whole course and lesson boundaries | Yes |
+| `global_course_plan_review.md` | Reviews/revises that global plan | Yes |
+| `global_course_consistency_review.md` | Checks the completed lesson set for consistency and coverage | Yes |
+| `course_trailer_advertisement_video_generation.md` | Defines the editorial package for a promotional Video 00 | No; it is currently a guided/manual workflow |
+
+For normal lesson generation, the system prompt is combined with `lesson_generation.md`;
+the review pass combines it with `lesson_review.md`; and the dedicated narration pass combines
+it with `narration_polish.md`. The trailer prompt is intentionally documented separately
+because no `microvid trailer` command consumes it yet.
+
 ---
 
 ## 15. Lesson-manifest structure
@@ -640,7 +704,52 @@ workspace/my_course/audio/video_NN/tts_manifest.yaml
 
 ---
 
-## 19. Physics Laboratory 101 reference workflow
+## 19. Publish lesson videos to YouTube
+
+First create and review the local publishing assets without remote writes:
+
+```powershell
+microvid youtube publish `
+  --workspace .\workspace\my_course `
+  --expected-channel @your_handle `
+  --dry-run
+```
+
+Review `youtube/youtube_metadata.yaml` and `youtube/course_cover.jpg`, then repeat the command
+without `--dry-run`. Publishing is public by default. State is saved after each remote action,
+so rerunning the same command resumes an interrupted upload. If lesson MP4s change after an
+upload, use the guarded replacement flags documented in
+[YOUTUBE_PUBLISHING.md](YOUTUBE_PUBLISHING.md); do not delete the state file and start over.
+
+YouTube publishing uses a Desktop OAuth client and a user consent token. The Google Cloud
+service-account credential used for TTS cannot authorize channel uploads.
+
+---
+
+## 20. Create and publish a course trailer (Video 00)
+
+The package includes the reusable editorial prompt
+`src/microvid/prompts/course_trailer_advertisement_video_generation.md`. It defines a truthful
+45–55 second promotional master, including positioning, narration, edit beats, clip selection,
+overlays, title/CTA, adaptation notes and QA.
+
+This is currently a guided production workflow, not an automated `microvid trailer` command.
+Generate the trailer package from the completed course assets, assemble the final MP4 with the
+course-native visuals and selected TTS voice, and store it in a dedicated location such as:
+
+```text
+workspace/my_course/trailer/video_00.mp4
+```
+
+Do **not** put `video_00.mp4` in `workspace/my_course/videos/` before running the standard
+YouTube publisher. That command currently discovers every `video_*.mp4` in that directory and
+requires one matching lesson manifest for each file; Video 00 therefore appears as an invalid
+extra lesson. Upload the trailer separately and place it first in the playlist after the lesson
+publisher completes. Follow [COURSE_TRAILER.md](COURSE_TRAILER.md) for the complete procedure.
+
+---
+
+## 21. Physics Laboratory 101 reference workflow
 
 For the current PDF-source pilot, assume the runtime manual is:
 
@@ -663,7 +772,7 @@ The existing nine-video definitions in the Lab 101 profile do not control the pr
 
 ---
 
-## 20. Deterministic/debug generation
+## 22. Deterministic/debug generation
 
 The deterministic builder has no global semantic reasoning and no Gemini narration editor. Use it only with profile mode:
 
@@ -680,7 +789,7 @@ This path is for diagnostics/regression work, not normal instructional authoring
 
 ---
 
-## 21. Development/cost controls
+## 23. Development/cost controls
 
 The following options weaken parts of the normal review architecture and should not be routine production defaults:
 
@@ -703,7 +812,7 @@ Set it to `false` only for deliberate A/B cost/quality testing.
 
 ---
 
-## 22. Large documents
+## 24. Large documents
 
 The global planner sends the complete structured extraction during global planning and refuses silent truncation. The default global source limit is:
 
@@ -715,7 +824,7 @@ For a source larger than that limit, use a deliberate hierarchical planning stra
 
 ---
 
-## 23. Troubleshooting
+## 25. Troubleshooting
 
 ### `microvid` is not recognized
 
@@ -758,6 +867,22 @@ Confirm `%LOCALAPPDATA%\Microvid\google_cloud_credentials.json` exists, or that 
 
 Also confirm Cloud Text-to-Speech is enabled and the project has suitable permissions/billing.
 
+### YouTube publishing reports an extra lesson or missing manifest
+
+Check `workspace/<course>/videos/` for a promotional `video_00.mp4` or any other MP4 that is
+not listed in `manifests/course.yaml`. The lesson publisher requires a one-to-one match. Move
+the trailer to `workspace/<course>/trailer/`, rerun publishing, then upload and position the
+trailer separately as described in [COURSE_TRAILER.md](COURSE_TRAILER.md).
+
+### YouTube OAuth or token refresh fails
+
+Confirm that `youtube_client_secret.json` is a Desktop app OAuth credential, the YouTube Data
+API is enabled, and the authorizing Google account owns or manages the intended channel. If a
+request to `oauth2.googleapis.com` fails with a TLS/SSL connection error, check the system
+clock, proxy or HTTPS inspection, firewall, and local certificate store before retrying. Keep a
+backup of `youtube_token.json` before deliberately reauthorizing; never substitute the TTS
+service-account JSON for the YouTube user token.
+
 ### FFmpeg is missing
 
 Install the project with its Windows extra. This includes a supported FFmpeg binary through `imageio-ffmpeg`:
@@ -781,7 +906,7 @@ Use natural narration and explicit `tts_text` for difficult expressions. Do not 
 
 ---
 
-## 24. Recommended first production test
+## 26. Recommended first production test
 
 For any new course:
 

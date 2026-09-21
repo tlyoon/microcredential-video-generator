@@ -17,6 +17,7 @@ Physics Laboratory 101 is the bundled reference implementation and sample course
 - [Configuration reference](docs/CONFIGURATION_REFERENCE.md)
 - [Google Cloud Chirp 3 HD TTS guide](docs/CHIRP_TTS.md)
 - [YouTube course publishing](docs/YOUTUBE_PUBLISHING.md)
+- [Course trailer / Video 00 workflow](docs/COURSE_TRAILER.md)
 - [Physics Lab 101 pilot workflow](docs/PILOT_WORKFLOW.md)
 - [Changelog](CHANGELOG.md)
 
@@ -175,6 +176,8 @@ course:
 
 The narration polish is enabled by default even for older profiles that omit the field. Set `narration_polish_pass: false` only for deliberate cost/diagnostic comparisons.
 
+`gemini-flash-latest` is a moving alias: Google may redirect it to a newer Flash model without a profile change. It is convenient for development, but production runs that must be reproducible should pin a concrete Gemini model ID supported by the installed SDK and account. Record the resolved model in the generated artifacts before comparing runs.
+
 For a zero-repeat local setup on Windows, create:
 
 ```text
@@ -265,6 +268,12 @@ The first run opens a browser for YouTube authorization and stores the reusable 
 for TTS cannot authorize personal YouTube uploads. See
 [YouTube course publishing](docs/YOUTUBE_PUBLISHING.md) for setup, preview, resume, and
 YouTube Course conversion details.
+
+The standard publisher currently uploads lesson videos only. Keep a promotional
+`video_00.mp4` outside `workspace\<course>\videos\`; otherwise it is discovered as an extra
+lesson and validation stops. Use the documented manual Video 00 workflow to upload the
+trailer and place it first in the playlist. See
+[Course trailer / Video 00 workflow](docs/COURSE_TRAILER.md).
 
 ## Automated production gates
 

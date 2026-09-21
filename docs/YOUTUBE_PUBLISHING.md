@@ -9,6 +9,10 @@ generates course and lesson metadata, creates a square course image, uploads the
 matching SRT files, and creates an ordered playlist. It saves every remote ID so an interrupted
 run can resume without knowingly duplicating videos.
 
+This command publishes course lessons V01–VNN. It does not currently manage a promotional
+Video 00. Keep `video_00.mp4` outside the workspace `videos` directory while using this command;
+see [COURSE_TRAILER.md](COURSE_TRAILER.md).
+
 ## One-time Google setup
 
 YouTube channel writes require user OAuth. The service-account JSON used by Google Cloud
@@ -38,6 +42,12 @@ The complete private configuration directory is:
 Do not commit these files. On the first publishing command, a browser opens so you can choose
 and authorize the Google account that owns the channel. Later runs reuse `youtube_token.json`.
 If the OAuth consent screen is in Testing mode, add your Google account as a test user.
+
+If authorization or token refresh fails, verify that the credential is a Desktop app client,
+the YouTube Data API is enabled, and the selected account manages the target channel. TLS/SSL
+errors contacting `oauth2.googleapis.com` usually indicate a local clock, proxy/HTTPS
+inspection, firewall or certificate-store problem. Correct that connection problem before
+re-authorizing, and back up the existing token before deliberately replacing it.
 
 ## Publish
 
@@ -146,6 +156,14 @@ image. YouTube currently exposes the final **Set as course** action in Studio:
 
 This Studio action requires channel access to YouTube's Course feature. The public playlist is
 already usable if that option is unavailable.
+
+## Add a course trailer as Video 00
+
+Run the lesson publisher first with only `video_01.mp4` through `video_NN.mp4` in the `videos`
+directory. Upload the completed trailer separately, add it to the same playlist, then move it
+ahead of Lesson 1 in YouTube Studio. The trailer has its own production guide because adding it
+to `videos/` makes the current lesson publisher treat it as an unexpected manifest-backed
+lesson. See [COURSE_TRAILER.md](COURSE_TRAILER.md) for file layout, production and verification.
 
 ## Command options
 
