@@ -27,7 +27,7 @@ course:
     voice_name: en-US-Chirp-HD-F
     ssml_gender: FEMALE
     audio_encoding: LINEAR16
-    speaking_rate: 1.2
+    speaking_rate: 0.8
   narration_wpm: 130
   max_slides: 7
   target_video_minutes: 6

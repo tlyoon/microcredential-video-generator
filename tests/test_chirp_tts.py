@@ -23,7 +23,7 @@ def test_default_chirp_config_is_en_us_female():
     assert cfg.voice_name == "en-US-Chirp-HD-F"
     assert cfg.ssml_gender == "FEMALE"
     assert cfg.audio_encoding == "LINEAR16"
-    assert cfg.speaking_rate == 1.2
+    assert cfg.speaking_rate == 0.8
     assert cfg.output_suffix == ".wav"
 
 

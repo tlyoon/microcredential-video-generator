@@ -44,7 +44,7 @@
 - Standalone narration, lecturer-note, and SRT subtitle assets.
 - Pluggable TTS provider layer.
 - Google Cloud Chirp 3 HD production TTS with configurable voice/locale/rate/location.
-- Default Google Cloud Chirp 3 HD voice `en-US-Chirp-HD-F`, with default speaking rate 1.2 on this development branch.
+- Default Google Cloud Chirp 3 HD voice `en-US-Chirp-HD-F`, with default speaking rate 0.8 on this development branch.
 - Windows SAPI fallback/offline TTS option.
 - Scientific speech normalization plus `tts_text` and `tts_replacements` overrides.
 - Voice audition workflow and TTS provenance logging.
