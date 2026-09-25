@@ -58,9 +58,10 @@ def test_concat_segments_stages_every_input_locally(monkeypatch, tmp_path):
     def fake_run(command, **kwargs):
         listing = Path(command[command.index("-i") + 1])
         entries = [
-            listing.parent / line.removeprefix("file '").removesuffix("'")
+            Path(line.removeprefix("file '").removesuffix("'"))
             for line in listing.read_text(encoding="utf-8").splitlines()
         ]
+        assert all(entry.is_absolute() for entry in entries)
         assert [entry.read_bytes() for entry in entries] == [b"segment-0", b"segment-1"]
         Path(command[-1]).write_bytes(b"video")
         return subprocess.CompletedProcess(command, 0)
@@ -158,3 +159,9 @@ def test_media_build_blocks_automated_qa_errors(monkeypatch, tmp_path):
     (workspace / "slides" / "video_01.pptx").write_bytes(b"pptx")
     with pytest.raises(RuntimeError, match="automated lesson QA"):
         media.build_windows_video(workspace, "V01", tts_config={"provider":"sapi"})
+
+def test_media_capabilities_requires_win32com_for_powerpoint(monkeypatch):
+    monkeypatch.setattr(media.os, "name", "nt")
+    real = media._module_available
+    monkeypatch.setattr(media, "_module_available", lambda name: False if name == "win32com.client" else real(name))
+    assert media.media_capabilities()["powerpoint_automation_possible"] is False

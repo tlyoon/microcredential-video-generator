@@ -105,7 +105,7 @@ def media_capabilities() -> dict[str, bool]:
         "ffmpeg": ffmpeg_executable() is not None,
         "libreoffice": shutil.which("libreoffice") is not None or shutil.which("soffice") is not None,
         "windows": os.name == "nt",
-        "powerpoint_automation_possible": os.name == "nt",
+        "powerpoint_automation_possible": os.name == "nt" and _module_available("win32com.client"),
         "sapi_tts_possible": os.name == "nt",
         "google_cloud_tts_package": _module_available("google.cloud.texttospeech"),
     }
@@ -167,7 +167,7 @@ def concat_segments(segments: list[Path], output: Path) -> None:
             staged_segments.append(staged)
         listing = staging / "segments.concat.txt"
         listing.write_text(
-            "\n".join(f"file '{path.name}'" for path in staged_segments),
+            "\n".join(f"file '{path.resolve()}'" for path in staged_segments),
             encoding="utf-8",
         )
         staged_output = staging / "video.mp4"

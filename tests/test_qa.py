@@ -96,3 +96,12 @@ def test_slide_command_does_not_emit_a_deck_when_manifest_has_blocking_qa(tmp_pa
     with pytest.raises(SystemExit, match="Slide production is blocked"):
         cli.cmd_slides(args)
     assert not called
+
+def test_validation_blocks_equation_that_office_math_cannot_convert():
+    slide = {
+        "id": "S1", "slide_type": "concept", "narration": "Explain.",
+        "onscreen": ["Line forms"], "source_block_ids": ["b1"],
+        "equation_latex": r"\begin{aligned} y &= mx+b && \text{(Slope)} \\ Ax+By &= C \end{aligned}",
+    }
+    issues = validate_manifest({"target_minutes": 1, "slides": [slide]})
+    assert any("cannot be converted to native Office Math" in i["message"] for i in issues)
