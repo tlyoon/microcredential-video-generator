@@ -6,6 +6,8 @@ from pathlib import Path
 
 import yaml
 
+from .office_math import latex_to_omml
+
 
 def _visible_slide_strings(slide: dict) -> list[str]:
     values = [str(slide.get("title", ""))]
@@ -47,6 +49,12 @@ def validate_slide_surface(slide: dict) -> list[dict]:
                 f"({len(onscreen)}/{line_limit} entries, {onscreen_chars}/{char_limit} characters)."
             ),
         })
+    equation = str(slide.get("equation_latex") or "").strip()
+    if equation:
+        try:
+            latex_to_omml(equation)
+        except Exception as exc:
+            issues.append({"severity": "error", "slide": slide_id, "message": f"equation_latex cannot be converted to native Office Math: {exc}"})
     visible_text = " ".join(_visible_slide_strings(slide))
     if re.search(r"\$[^$]+\$|\\(?:frac|sqrt|sum|begin|mathrm|left|right)\b", visible_text):
         issues.append({
