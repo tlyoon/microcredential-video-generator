@@ -167,7 +167,7 @@ def concat_segments(segments: list[Path], output: Path) -> None:
             staged_segments.append(staged)
         listing = staging / "segments.concat.txt"
         listing.write_text(
-            "\n".join(f"file '{path.name}'" for path in staged_segments),
+            "\n".join(f"file '{path.resolve()}'" for path in staged_segments),
             encoding="utf-8",
         )
         staged_output = staging / "video.mp4"
