@@ -16,7 +16,7 @@ class FakeProvider:
     def generate_json(self, prompt, schema):
         self.calls += 1
         self.prompts.append(prompt)
-        if "DEDICATED NARRATION POLISH PASS" in prompt:
+        if "DEDICATED NARRATION POLISH" in prompt:
             return {
                 "slides": [
                     {
@@ -171,7 +171,7 @@ def test_llm_builder_adds_dedicated_narration_polish_and_preserves_provenance(tm
     )
 
     assert provider.calls == 3
-    assert any("DEDICATED NARRATION POLISH PASS" in p for p in provider.prompts)
+    assert any("DEDICATED NARRATION POLISH" in p for p in provider.prompts)
     assert any("Feynman-inspired" in p for p in provider.prompts)
     assert manifest["generation"]["mode"] == "llm"
     assert manifest["generation"]["passes"] == 3

@@ -1,114 +1,108 @@
-﻿# GLOBAL COURSE PLANNING — READ THE WHOLE SOURCE BEFORE SEGMENTING
+# GLOBAL COURSE PLANNING — WHOLE-SOURCE PEDAGOGICAL DESIGN
 
 You are planning the complete self-learning microcredential course before any individual slide deck is written.
 
-Read the complete structured source as one coherent document. Understand its conceptual structure, dependencies, repeated ideas, worked examples, equations, cautions, misconceptions, data, tables, and reporting conventions before deciding lesson boundaries. Do not mechanically turn document sections or pages into videos.
+Read the complete structured source as one coherent document. Understand its conceptual structure, dependencies, repeated ideas, worked examples, equations, figures, cautions, misconceptions, data, tables, and interpretation before deciding lesson boundaries. Do not mechanically turn pages or headings into videos.
 
-## 1. Required planning behavior
+## 1. Planning priorities
 
 1. Build a coherent mental model of the entire source before segmenting it.
 2. Identify foundational concepts and prerequisite relationships.
-3. Group source blocks pedagogically even when they are far apart in the document.
-4. Keep worked examples with the concepts they illuminate; preserve complete reasoning chains.
+3. Group source blocks pedagogically even when they are separated in the document.
+4. Keep worked examples with the concepts they illuminate and preserve complete reasoning chains.
 5. Merge short or repetitive sections when one stronger lesson gives a better conceptual arc.
 6. Split conceptually dense material when one lesson would overload a self-directed learner.
 7. Avoid reteaching the same idea unless deliberate reinforcement is educationally justified.
-8. Preserve the source as the authority. Do not invent subject matter or source IDs.
+8. Preserve the source as the authority; do not invent subject matter, numerical data, equations, source IDs, or external figures.
 9. Assign explicit `core_block_ids` to each video and use `reference_block_ids` only for useful supporting detail.
-10. Treat target duration and total course duration as design constraints, not excuses to omit essential reasoning.
+10. Treat duration and slide limits as design constraints, not excuses to omit essential reasoning.
 11. Make the course cumulative: record prerequisites, what is already taught, and what later lessons build upon.
 12. Prefer a small number of coherent lessons over fragmented coverage.
+## 2. Plan a teaching story, not a topic list
 
-## 2. Plan a narrative, not a list of topics
+For every planned video, design a deliberate instructional arc. The learner should be able to see why the topic matters, how the ideas connect, and where the formal mathematics fits.
 
-For every planned video, determine the instructional story before choosing slides. Use a Feynman-inspired explanatory sequence whenever the source supports it:
-
-- begin with a concrete question, observation, experiment, consequence, or learner difficulty;
-- establish why the idea is needed;
-- develop an intuitive physical or conceptual picture;
-- introduce formal mathematics only when the learner can see what problem it solves;
-- interpret the mathematics physically or experimentally;
-- apply the idea in a worked example, decision, comparison, or data interpretation when useful;
+Use this sequence when the source supports it:
+- begin with a concrete physical question, observation, consequence, or learner difficulty;
+- give a big-picture orientation before details;
+- establish the intuitive or physical model;
+- introduce formal mathematics only after its purpose is clear;
+- explain what each important equation means physically;
+- bridge nontrivial transitions between equations or ideas;
+- use a worked example, figure, graph, comparison, or decision when it advances understanding;
 - test the central distinction with a conceptual check;
-- close by reconstructing the central idea in plain language.
+- finish with a concise synthesis.
 
-Do not force every phase into a separate slide, but make the narrative logic explicit in `narrative_arc`.
+Do not force every phase into a separate slide, but make the logic explicit in `narrative_arc`.
 
-## 3. Visual strategy must be planned globally
+The first substantive teaching slide must not be a thin agenda. It must orient the learner to the whole lesson: what the topic is about, the governing question, the important quantities or relationships, and the route the lesson will take.
 
-The existing videos should not look like a sequence of static lecture notes. Plan visual representations that make the reasoning visible.
+The final slide must be a true conclusion: resolve the opening question, reconnect formalism to intuition, and state the two or three most durable takeaways. It must not introduce new content.
+## 3. Mathematical continuity and technical bridges
 
-For each video identify a `visual_strategy`: the two to six most useful visual forms for that lesson. Examples include a labelled conceptual diagram, a process flow, a two-column contrast, a reduced source table, a graph supported by source data, an equation with highlighted terms, a staged worked example, or a source figure.
+Plan enough slide capacity for the mathematics to be understandable rather than merely displayed.
 
-Use visual variety only when it serves comprehension. Avoid several consecutive slides that would all be title-plus-bullets. If a concept can be understood faster through a diagram, table, plot, comparison, or staged flow, plan that representation instead of prose.
+When the source moves from one equation to another with compressed reasoning, preserve the source result but plan a bridge that makes the transition intelligible. A bridge may explain:
+- which definition, conservation statement, derivative, algebraic substitution, limiting case, or sign convention is being used;
+- why the next expression follows;
+- what changes physically and what remains invariant;
+- what a slope, derivative, integral, proportionality, negative sign, vector direction, or boundary condition means.
 
-Do not invent numerical data or external images. Source-supported information may be reorganized into pedagogical diagrams, comparisons, or compact tables.
+You may spell out intermediate algebra/calculus/logic that follows directly from the supplied source and ordinary prerequisites. Do not introduce a new physical assumption or unsupported result. If a safe bridge cannot be made from the source/context, preserve the ambiguity and flag it.
 
-## 4. Feynman-inspired explanatory planning
+Plan equation-centered slides when a formula is central. Do not plan dense prose around an important equation. Where several equations form one reasoning chain, allocate enough slides or stages to make the chain readable.
 
-For each video identify:
+## 4. Visual strategy and source figures
 
-- `opening_question`: the concrete question or problem that gives the lesson a reason to exist;
-- `key_analogy`: one concise analogy or physical picture if it genuinely clarifies the mechanism; use an empty string when no analogy is warranted;
-- `likely_misconceptions`: the most important source-supported learner confusions to resolve;
-- `narrative_arc`: three to six short stages describing the conceptual progression;
-- `visual_strategy`: two to six visual forms that best support those stages.
+The course must not look like static lecture notes. For each video identify two to six useful visual forms in `visual_strategy`: source figure, labelled conceptual diagram, process flow, comparison, reduced source table, source-supported graph, equation focus, or staged worked example.
 
-Do not use analogy as entertainment. An analogy must illuminate structure without adding unsupported physics.
+When `source_document.available_figures` is non-empty, actively inspect whether a supplied figure is pedagogically important. For textbook subchapters, include relevant source figures whenever they materially improve understanding; do not omit a central graph or diagram merely to simplify production.
+For each important source figure, plan what the learner should notice and which equation or concept it supports. Prefer a figure-centered explanation over duplicating the same information in bullets. Never request external stock imagery or invent a replacement for an authoritative source figure.
 
-## 5. Mandatory self-learning lesson architecture
+Use visual variety only when it improves comprehension. Avoid several consecutive title-plus-bullets slides. If a concept can be understood faster through a figure, graph, diagram, comparison, process, compact table, or equation focus, plan that representation instead.
+
+## 5. Mandatory lesson architecture
 
 Every LLM-planned video must reserve enough slide capacity for:
-
 1. an opening introduction that motivates and orients the learner;
-2. coherent concept development;
+2. coherent concept development with sufficient technical bridges;
 3. at least one conceptual or reasoning check;
-4. a final conclusion that synthesizes what the learner should now understand or be able to do.
+4. a concise final conclusion.
 
 Therefore every planned video must have `max_slides >= 5`.
 
-For ordinary structured DOCX/PDF sources, the first generated slide should normally be `introduction` and the final slide `conclusion`.
+For ordinary structured DOCX/PDF lessons, the first generated slide should normally be `introduction` and the final slide `conclusion`.
 
-For textbook-subchapter sources, preserve the stricter minimum architecture: `title` -> `introduction` -> concept development -> `check` -> `conclusion`.
+For textbook-subchapter sources, preserve the stricter architecture: `title` -> `introduction` -> concept development -> `check` -> `conclusion`.
 
-The introduction should not begin with an administrative agenda. Prefer a concrete problem, observation, practical consequence, or discriminating question. The conclusion must synthesize rather than merely repeat a list and must not introduce new content.
+The textbook title slide is only a visual title card. The following introduction slide must carry the substantive orientation: the topic's big idea, motivating question, key quantities/relationships, and a short conceptual roadmap.
 
-## 6. Concept map
+## 6. Concept map and video plan fields
 
-Create a concise concept map for the entire source. For each major concept identify supporting source block IDs and prerequisite concepts. This map is supplied to every later lesson-generation call.
+Create a concise concept map for the complete source. For each major concept identify supporting source block IDs and prerequisite concepts.
 
-## 7. Video plan fields
+For every planned video provide the schema-required fields faithfully, including `opening_question`, `narrative_arc`, `key_analogy`, `likely_misconceptions`, `visual_strategy`, `check_question`, `takeaways`, authoritative block IDs, prerequisites, already-taught concepts, and forward links.
+## 7. Coverage discipline
 
-For every planned video provide:
+Do not put administrative boilerplate, contents text, duplicated wording, or reference-only material into a video merely for completeness. However, substantive concepts, assumptions, equations, worked examples, figures, limitations, and interpretations must not disappear because they do not align with a section boundary. Use `coverage_notes` to explain intentional omission or reference-only treatment.
 
-- stable video ID in sequence (`V01`, `V02`, ...);
-- concise instructional title;
-- focus or purpose;
-- realistic target duration and maximum slide count;
-- learning outcomes;
-- `opening_question`;
-- `narrative_arc`;
-- `key_analogy`;
-- `likely_misconceptions`;
-- `visual_strategy`;
-- one useful conceptual check question;
-- up to three takeaways;
-- authoritative `core_block_ids`;
-- optional `reference_block_ids`;
-- prerequisite video IDs;
-- `already_taught` concepts;
-- `forward_links` for later lessons.
+## 8. Textbook-subchapter mode
 
-## 8. Coverage discipline
+When `source_document.classification.kind` is `textbook_subchapter`, the ingestion layer has already scoped the intended numbered subchapter. Treat the supplied blocks and figure assets as the complete authoritative scope. Do not restore excluded adjacent sections.
 
-Do not feel obliged to put administrative boilerplate, table-of-contents text, duplicated wording, or reference checklists into a video. However, substantive concepts, assumptions, equations, worked examples, limitations, and interpretation must not disappear merely because they do not align with a section boundary. Use `coverage_notes` to explain intentionally omitted or reference-only material.
+For a short self-contained subchapter, prefer one coherent video unless conceptual density genuinely requires more than one. Cover the substantive ideas, equations, examples, cautions, figures, and interpretation of the scoped subchapter without importing unsupported content.
 
-## 9. Textbook-subchapter planning mode
+The planned stack should read as a miniature lesson rather than a summary: orient -> explain -> bridge -> interpret -> check -> conclude.
 
-When `source_document.classification.kind` is `textbook_subchapter`, the ingestion layer has already scoped the intended numbered subchapter. Treat the supplied blocks as the complete authoritative scope. Do not restore or plan from adjacent sections that were excluded during ingestion.
+## 9. Planning self-audit
 
-For a short self-contained subchapter, prefer one coherent video unless conceptual density genuinely requires more than one. The check question should strengthen conceptual understanding rather than test recall. Cover the substantive ideas, equations, examples, cautions, figures, and interpretations of the scoped subchapter without importing unsupported material.
-
-When `source_document.available_figures` is non-empty, treat those figures as authoritative source context rather than decoration. Plan a figure-centered explanation when a supplied figure is central to understanding, and reduce text density accordingly. Do not request external images or substitute stock imagery.
+Before returning the plan, silently verify:
+- Does every lesson have a strong big-picture introduction rather than a thin agenda?
+- Is enough slide capacity reserved to explain nontrivial equation transitions?
+- Are important source figures deliberately assigned where useful?
+- Is the visual strategy richer than repeated bullet slides?
+- Is there a genuine reasoning check?
+- Does the conclusion resolve the opening question and give concise durable takeaways?
+- Is every substantive claim and source assignment grounded in the supplied document?
 
 Return only JSON conforming to the supplied schema.

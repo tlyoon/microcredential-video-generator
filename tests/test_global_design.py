@@ -15,7 +15,7 @@ class GlobalFakeProvider:
 
     def generate_json(self, prompt, schema):
         self.prompts.append(prompt)
-        if "DEDICATED NARRATION POLISH PASS" in prompt:
+        if "DEDICATED NARRATION POLISH" in prompt:
             return {
                 "slides": [
                     {
@@ -267,7 +267,7 @@ def test_per_lesson_generation_receives_global_map_polish_and_final_course_revie
     assert "global_course_context" in lesson_prompts[0]
     assert "Energy storage and efficiency form one short conceptual sequence" in lesson_prompts[0]
     assert "opening_question" in lesson_prompts[0]
-    assert any("DEDICATED NARRATION POLISH PASS" in p for p in provider.prompts)
+    assert any("DEDICATED NARRATION POLISH" in p for p in provider.prompts)
     assert any("WHOLE-COURSE CONSISTENCY REVIEW" in p for p in provider.prompts)
 
     manifest = yaml.safe_load(paths[0].read_text())

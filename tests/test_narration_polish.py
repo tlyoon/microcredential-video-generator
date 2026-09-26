@@ -46,6 +46,10 @@ def _manifest():
                 "onscreen": ["Compare the contributions"],
                 "narration": "Compare them.",
                 "visual_direction": "Highlight the larger contribution.",
+                "visual_type": "comparison",
+                "visual_panels": [{"heading": "Large term", "body": ["Dominant contribution"]}],
+                "table_headers": ["Term", "Contribution"],
+                "table_rows": [["A", "Large"]],
                 "equation_latex": None,
                 "source_block_ids": ["b0001"],
                 "estimated_seconds": 40,
@@ -85,7 +89,11 @@ def test_narration_polish_changes_only_spoken_fields_and_records_metrics():
 
     polished = polish_lesson_narration(manifest, _context(), provider)
 
-    assert "DEDICATED NARRATION POLISH PASS" in provider.prompt
+    assert "DEDICATED NARRATION POLISH" in provider.prompt
+    assert '"visual_type": "comparison"' in provider.prompt
+    assert '"visual_panels"' in provider.prompt
+    assert '"table_headers"' in provider.prompt
+    assert '"table_rows"' in provider.prompt
     assert polished["slides"][0]["title"] == original_title
     assert polished["slides"][0]["source_block_ids"] == original_source_ids
     assert polished["slides"][0]["narration"].startswith("Focus on the larger contribution")
