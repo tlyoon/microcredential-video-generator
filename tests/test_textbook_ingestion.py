@@ -4,6 +4,7 @@ import fitz
 import pytest
 
 from microvid.qa import validate_manifest
+from microvid.llm_manifest_builder import _normalize_manifest
 from microvid.source_parser import extract_source, write_extraction
 from microvid.source_selection import resolve_source_path
 from microvid.textbook_ingestion import prepare_pdf_extraction
@@ -135,3 +136,36 @@ def test_textbook_manifest_requires_title_intro_check_and_conclusion():
     assert "title slide" in messages
     assert "introduction slide" in messages
     assert "conclusion slide" in messages
+
+
+def test_textbook_normalizer_canonicalizes_visible_conclusion_title():
+    class Provider:
+        provider_name = "gemini"
+        model = "fake"
+
+    extraction = {
+        "source_classification": {"kind": "textbook_subchapter"},
+        "blocks": [{"id": "b1", "text": "Target content", "section": "7.8", "metadata": {}}],
+        "figure_assets": [],
+    }
+    generated = {
+        "lesson_title": "Target",
+        "learning_outcomes": [],
+        "editorial_flags": [],
+        "slides": [
+            {
+                "slide_type": "conclusion", "title": "", "onscreen": ["Remember the relationship"],
+                "narration": "Close the lesson.", "lecturer_notes": [], "visual_direction": "",
+                "visual_type": "text", "visual_panels": [], "table_headers": [], "table_rows": [],
+                "equation_latex": None, "figure_ids": [], "source_block_ids": ["b1"],
+                "estimated_seconds": 20,
+            }
+        ],
+    }
+    course = {"target_video_minutes": 3}
+    lesson = {"id": "V01", "title": "Target", "focus": "Target", "target_minutes": 3}
+    manifest = _normalize_manifest(
+        generated, extraction, course, lesson, extraction["blocks"], [], Provider(),
+        generation_passes=1, design_mode="global_llm",
+    )
+    assert manifest["slides"][0]["title"] == "Conclusion"
