@@ -26,14 +26,14 @@ def _raw_and_scoped():
         "blocks": [
             {"id": "b1", "text": "7.8 Target Section", "section": "7.8", "metadata": {"page_number": 1, "bbox": [72, 75, 220, 95]}},
             {"id": "b2", "text": "Target content explains the slope-force relationship.", "section": "7.8", "metadata": {"page_number": 1, "bbox": [72, 120, 400, 145]}},
-            {"id": "b3", "text": "7.9 Adjacent Section", "section": "7.9", "metadata": {"page_number": 1, "bbox": [72, 175, 230, 195]}},
+            {"id": "b3", "text": "7.9 Adjacent Section. As shown in Quick Quiz 7.8, the slope gives the force direction.", "section": "7.9", "metadata": {"page_number": 1, "bbox": [72, 175, 520, 205]}},
             {"id": "b4", "text": "Figure 7.21 Potential-energy curve illustrating slope.", "section": "7.9", "metadata": {"page_number": 1, "bbox": [300, 495, 560, 520]}},
         ]
     }
     scoped = {
         "source_classification": {"kind": "textbook_subchapter"},
         "blocks": raw["blocks"][:2],
-        "textbook_subchapter_ingestion": {"applied": True, "included_block_ids": ["b1", "b2"]},
+        "textbook_subchapter_ingestion": {"applied": True, "target_section": "7.8", "included_block_ids": ["b1", "b2"]},
     }
     return raw, scoped
 
@@ -52,6 +52,8 @@ def test_figure_inventory_runs_before_scope_and_keeps_adjacent_same_page_candida
     assert asset["aspect_ratio"] > 0
     assert asset["fit_policy"] == "bounded_box_keep_aspect_ratio"
     assert asset["recommended_layout_hint"] in {"image_large", "image_right"}
+    assert asset["explicit_target_cross_reference"] is True
+    assert asset["recommended_for_target"] is True
     assert (tmp_path / asset["asset_path"].replace("extracted/figures/", "figures/")).is_file()
 
 
@@ -91,3 +93,17 @@ def test_textbook_conclusion_requires_visible_conclusion_title():
     m["slides"][-1]["title"] = ""
     issues = validate_manifest(m)
     assert any(i["severity"] == "error" and "visible title 'Conclusion'" in i["message"] for i in issues)
+
+
+def test_recommended_target_figure_cannot_be_waived_by_omission_reason():
+    m = _manifest_with_figure_candidate("Adjacent caption would otherwise be omitted.")
+    m["figure_assets"][0].update({
+        "group_label": "Figure 7.21",
+        "recommended_for_target": True,
+        "explicit_target_cross_reference": True,
+    })
+    issues = validate_manifest(m)
+    assert any(
+        i["severity"] == "error" and "explicitly relevant to the target subsection" in i["message"]
+        for i in issues
+    )

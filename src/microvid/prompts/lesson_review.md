@@ -62,6 +62,8 @@ Enforce these production limits during revision:
 
 A learner should know what to inspect within a few seconds.
 
+For textbook figures, inspect `available_figures` before accepting a figure-free revision. Any candidate marked `recommended_for_target: true` must be used on at least one pedagogically appropriate slide. An adjacent caption is not grounds for omission when the candidate explicitly cross-references the target subsection. Use only the part of its meaning that is already supported by the target lesson; do not teach unrelated material from the neighboring subsection.
+
 ## 7. Mathematics and worked reasoning
 
 If an equation is central, use `equation_focus` or another layout that gives it adequate visual space and pairs it with a compact interpretation. Preserve exact source-supported mathematics in `equation_latex`.

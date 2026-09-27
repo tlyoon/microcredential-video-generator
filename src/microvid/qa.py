@@ -185,12 +185,35 @@ def validate_manifest(m: dict) -> list[dict]:
             issues.append({"severity": "error", "message": "Textbook subchapter must end with a conclusion slide."})
         elif str(slides[-1].get("title", "")).strip() != "Conclusion":
             issues.append({"severity": "error", "message": "Textbook conclusion slide must use the visible title 'Conclusion'."})
-        if m.get("figure_assets") and not any(slide.get("figure_ids") for slide in slides):
-            reason = str(m.get("figure_omission_reason", "") or "").strip()
-            if not reason:
-                issues.append({"severity": "error", "message": "Textbook figure candidates are available but none are used; give a specific figure_omission_reason or select a pedagogically relevant source figure."})
-            else:
-                issues.append({"severity": "warning", "message": f"All available figure candidates were omitted: {reason}"})
+        if m.get("figure_assets"):
+            used_figure_ids = {
+                str(figure_id)
+                for slide in slides
+                for figure_id in (slide.get("figure_ids") or [])
+            }
+            recommended_assets = [
+                figure for figure in (m.get("figure_assets") or [])
+                if figure.get("recommended_for_target")
+            ]
+            recommended_ids = {str(figure.get("id")) for figure in recommended_assets}
+            if recommended_ids and not (used_figure_ids & recommended_ids):
+                labels = [
+                    str(figure.get("group_label") or figure.get("id"))
+                    for figure in recommended_assets
+                ]
+                issues.append({
+                    "severity": "error",
+                    "message": (
+                        "A source figure explicitly relevant to the target subsection must be used rather than "
+                        f"waived by a general omission reason. Recommended candidates: {labels}."
+                    ),
+                })
+            elif not used_figure_ids:
+                reason = str(m.get("figure_omission_reason", "") or "").strip()
+                if not reason:
+                    issues.append({"severity": "error", "message": "Textbook figure candidates are available but none are used; give a specific figure_omission_reason or select a pedagogically relevant source figure."})
+                else:
+                    issues.append({"severity": "warning", "message": f"All available figure candidates were omitted: {reason}"})
     if len(slides) > 9:
         issues.append({"severity": "warning", "message": f"High slide count: {len(slides)}."})
     valid_figure_ids = {str(item.get("id")) for item in m.get("figure_assets", []) or []}

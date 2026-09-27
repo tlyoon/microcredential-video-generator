@@ -121,6 +121,10 @@ Figure rules:
 The extraction layer supplies cropped figure assets from the PDF. Choose the crop only when its relevant labels/axes/annotations are sufficiently complete and it clearly corresponds to the intended concept. If the supplied crop is ambiguous, truncated, mismatched, or unusable, do not guess which nearby figure belongs; omit it safely and record an `editorial_flag`.
 
 A figure must have a teaching purpose. Do not paste it as decoration.
+
+### Target-cross-reference rule
+
+The extraction layer may mark a figure with `recommended_for_target: true`. This is a strong, auditable signal that the figure is inside the target subsection, is explicitly referenced by the target text, or its adjacent context explicitly cross-references the target subsection. At least one such recommended figure must be used when any are supplied. Do not omit a recommended figure merely because its printed caption appears just before or after the formal subsection boundary. Restrict the explanation to the target concept already established by the authoritative target blocks; do not import unrelated adjacent-section theory. If the crop itself is genuinely unusable or misleading, record that as an `editorial_flag` and use another recommended target figure if available.
 ## F2. Systematic figure preflight and SlidePlan (MicroGen-derived discipline)
 
 Before emitting the structured lesson, construct an internal `SlidePlan`. This is mandatory planning, not output. Include one plan entry for every major definition, law/property, central equation, nontrivial derivation step, worked example, misconception/caution, conceptual check, relevant figure, and conclusion takeaway that must survive from the assigned source.
