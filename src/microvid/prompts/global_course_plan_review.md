@@ -21,6 +21,8 @@ Check especially:
 - whether the course would otherwise devolve into repeated heading-plus-bullets slides;
 - whether the sequence minimizes unnecessary repetition while preserving useful reinforcement;
 - whether every `core_block_id` and `reference_block_id` is grounded in the supplied source;
+- whether lesson IDs are exactly sequential structural IDs `V01`, `V02`, `V03`, ... in `videos` order, with no semantic/title-derived slugs;
+- whether every `prerequisite_video_id` uses those canonical IDs and refers only to an earlier lesson;
 - whether `already_taught`, prerequisite relationships, and forward links accurately reflect the planned sequence.
 
 Apply Feynman-inspired clarity as a planning criterion: each lesson should expose the question behind the formalism, build intuition before or alongside equations, and end with an interpretable conclusion. Do not add unsupported anecdotes, analogies, data, or domain facts.

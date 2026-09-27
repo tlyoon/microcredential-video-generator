@@ -7,6 +7,7 @@ from pathlib import Path
 import yaml
 
 from .office_math import latex_to_omml
+from .video_ids import is_canonical_video_id
 
 
 def _visible_slide_strings(slide: dict) -> list[str]:
@@ -98,6 +99,9 @@ def validate_slide_surface(slide: dict) -> list[dict]:
 
 def validate_manifest(m: dict) -> list[dict]:
     issues: list[dict] = []
+    video_id = str(m.get("video_id", ""))
+    if not is_canonical_video_id(video_id):
+        issues.append({"severity": "error", "message": f"Manifest video_id {video_id!r} is not canonical; expected V01, V02, ..."})
     slides = m.get("slides", [])
     if not slides:
         issues.append({"severity": "error", "message": "Manifest contains no slides."})
