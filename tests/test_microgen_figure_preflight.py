@@ -3,6 +3,7 @@ from pathlib import Path
 import fitz
 
 from microvid.qa import validate_manifest
+from microvid.llm_manifest_builder import _normalize_manifest
 from microvid.textbook_figures import extract_textbook_figure_assets
 
 
@@ -107,3 +108,38 @@ def test_recommended_target_figure_cannot_be_waived_by_omission_reason():
         i["severity"] == "error" and "explicitly relevant to the target subsection" in i["message"]
         for i in issues
     )
+
+
+def test_adjacent_figure_context_ids_are_not_academic_slide_provenance():
+    class Provider:
+        provider_name = "gemini"
+        model = "fake"
+
+    extraction = {
+        "source_classification": {"kind": "textbook_subchapter"},
+        "blocks": [{"id": "b1", "text": "Target slope-force relation", "section": "7.8", "metadata": {}}],
+        "figure_assets": [{
+            "id": "fig1", "source_block_ids": ["b46", "b47"],
+            "recommended_for_target": True, "group_label": "Figure 7.21",
+        }],
+    }
+    generated = {
+        "lesson_title": "Target", "learning_outcomes": [], "editorial_flags": [],
+        "slides": [{
+            "slide_type": "concept", "title": "", "onscreen": ["Slope determines force"],
+            "narration": "Use the curve to inspect the slope.", "lecturer_notes": [],
+            "visual_direction": "Inspect the curve.", "visual_type": "figure",
+            "visual_panels": [], "table_headers": [], "table_rows": [],
+            "equation_latex": None, "figure_ids": ["fig1"],
+            "source_block_ids": ["b1", "b46", "b47"], "estimated_seconds": 30,
+        }],
+    }
+    manifest = _normalize_manifest(
+        generated, extraction, {"target_video_minutes": 3},
+        {"id": "V01", "title": "Target", "focus": "Target", "target_minutes": 3},
+        extraction["blocks"], [], Provider(), generation_passes=1, design_mode="global_llm",
+    )
+    slide = manifest["slides"][0]
+    assert slide["source_block_ids"] == ["b1"]
+    assert slide["figure_context_block_ids"] == ["b46", "b47"]
+    assert slide["figure_ids"] == ["fig1"]
