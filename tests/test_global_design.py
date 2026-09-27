@@ -269,6 +269,8 @@ def test_per_lesson_generation_receives_global_map_polish_and_final_course_revie
     assert "opening_question" in lesson_prompts[0]
     assert any("DEDICATED NARRATION POLISH" in p for p in provider.prompts)
     assert any("WHOLE-COURSE CONSISTENCY REVIEW" in p for p in provider.prompts)
+    consistency_prompts = [p for p in provider.prompts if "WHOLE-COURSE CONSISTENCY REVIEW" in p]
+    assert any("final `conclusion` slide must use the visible title `Conclusion`" in p for p in consistency_prompts)
 
     manifest = yaml.safe_load(paths[0].read_text())
     assert manifest["generation"]["narration_polish"]["enabled"] is True
