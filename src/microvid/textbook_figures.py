@@ -182,6 +182,47 @@ def _scope_position(raw_extraction: dict, scoped_extraction: dict, source_block_
     return "within_target_span", 0
 
 
+def _target_relevance_metadata(
+    scoped_extraction: dict,
+    *,
+    group_label: str | None,
+    caption: str,
+    context: str,
+    scope_relation: str,
+) -> dict[str, Any]:
+    scope = scoped_extraction.get("textbook_subchapter_ingestion") or {}
+    target_section = str(scope.get("target_section", "") or "").strip()
+    scoped_text = " ".join(
+        str(block.get("text", "")) for block in scoped_extraction.get("blocks", [])
+    )
+    candidate_text = f"{caption}\n{context}"
+    explicit_target_cross_reference = False
+    if target_section:
+        explicit_target_cross_reference = bool(
+            re.search(rf"(?<!\d){re.escape(target_section)}(?!\d)", candidate_text)
+        )
+    target_label_reference = bool(
+        group_label and str(group_label).lower() in scoped_text.lower()
+    )
+    within_target = scope_relation in {"within_target", "within_target_span"}
+    recommended = within_target or explicit_target_cross_reference or target_label_reference
+    if within_target:
+        reason = "figure caption belongs to the target subsection"
+    elif target_label_reference:
+        reason = "target subsection explicitly references this figure label"
+    elif explicit_target_cross_reference:
+        reason = "adjacent figure context explicitly cross-references the target subsection"
+    else:
+        reason = "adjacent candidate without an explicit target cross-reference"
+    return {
+        "target_section": target_section or None,
+        "explicit_target_cross_reference": explicit_target_cross_reference,
+        "target_label_reference": target_label_reference,
+        "recommended_for_target": recommended,
+        "target_relevance_reason": reason,
+    }
+
+
 def _layout_metadata(width_px: int, height_px: int) -> dict[str, Any]:
     ratio = width_px / max(1, height_px)
     if ratio > 1.6:
@@ -288,6 +329,13 @@ def extract_textbook_figure_assets(
                 relation, distance = _scope_position(
                     raw_source, extraction, caption["source_block_id"]
                 )
+                relevance = _target_relevance_metadata(
+                    extraction,
+                    group_label=caption.get("label"),
+                    caption=caption.get("caption", ""),
+                    context=context,
+                    scope_relation=relation,
+                )
                 assets.append(
                     {
                         "id": asset_id,
@@ -303,6 +351,7 @@ def extract_textbook_figure_assets(
                         "asset_path": f"extracted/figures/{filename}",
                         "source_type": source_type,
                         "bbox": [round(float(value), 2) for value in clip],
+                        **relevance,
                         **_layout_metadata(width_px, height_px),
                     }
                 )
@@ -336,6 +385,11 @@ def extract_textbook_figure_assets(
                         "caption_source_block_id": None,
                         "scope_relation": "same_page_unlabelled",
                         "scope_distance_blocks": 0,
+                        "target_section": (extraction.get("textbook_subchapter_ingestion") or {}).get("target_section"),
+                        "explicit_target_cross_reference": False,
+                        "target_label_reference": False,
+                        "recommended_for_target": False,
+                        "target_relevance_reason": "unlabelled same-page image requires manual semantic justification",
                         "asset_path": f"extracted/figures/{filename}",
                         "source_type": "embedded_image",
                         "bbox": [round(float(value), 2) for value in clip],
