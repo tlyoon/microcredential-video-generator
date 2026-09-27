@@ -117,6 +117,7 @@ def _textbook_manifest(slide_types):
             }
         )
     return {
+        "video_id": "V01",
         "title": lesson_title,
         "source_document_type": "textbook_subchapter",
         "source_core_block_count": 1,

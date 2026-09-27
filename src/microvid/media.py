@@ -12,6 +12,7 @@ import yaml
 from .qa import validate_manifest
 from .speech import normalize_scientific_speech
 from .tts import TTSConfig, provider_from_tts_config
+from .video_ids import parse_canonical_video_id
 
 FFMPEG_PATH_ENV = "MICROVID_FFMPEG"
 FFMPEG_TIMEOUT_ENV = "MICROVID_FFMPEG_TIMEOUT_SECONDS"
@@ -196,7 +197,7 @@ def build_windows_video(
     tts_config: dict | TTSConfig | None = None,
 ) -> Path:
     workspace = Path(workspace)
-    num = int(video_id.upper().lstrip("V"))
+    num = parse_canonical_video_id(video_id)
     manifest_path = workspace / "manifests" / f"video_{num:02d}.yaml"
     deck = workspace / "slides" / f"video_{num:02d}.pptx"
     if not manifest_path.exists() or not deck.exists():

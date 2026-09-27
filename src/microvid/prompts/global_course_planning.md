@@ -77,16 +77,25 @@ For textbook-subchapter sources, preserve the stricter architecture: `title` -> 
 
 The textbook title slide is only a visual title card. The following introduction slide must carry the substantive orientation: the topic's big idea, motivating question, key quantities/relationships, and a short conceptual roadmap.
 
-## 6. Concept map and video plan fields
+## 6. Structural lesson IDs are not semantic labels
+
+Lesson IDs are machine identifiers used by filenames, slide IDs, media rendering, QA, and publishing. They must be sequential and structural, never descriptive.
+
+- Use exactly `V01`, `V02`, `V03`, ... in the same order as the `videos` array.
+- Do not generate semantic IDs such as `vid_energy_conservation`, `section_7_8`, or title-derived slugs.
+- `prerequisite_video_ids` must use only these canonical `V##` IDs and may refer only to earlier lessons.
+- Put human-readable meaning in `title` and `focus`, not in `id`.
+
+## 7. Concept map and video plan fields
 
 Create a concise concept map for the complete source. For each major concept identify supporting source block IDs and prerequisite concepts.
 
 For every planned video provide the schema-required fields faithfully, including `opening_question`, `narrative_arc`, `key_analogy`, `likely_misconceptions`, `visual_strategy`, `check_question`, `takeaways`, authoritative block IDs, prerequisites, already-taught concepts, and forward links.
-## 7. Coverage discipline
+## 8. Coverage discipline
 
 Do not put administrative boilerplate, contents text, duplicated wording, or reference-only material into a video merely for completeness. However, substantive concepts, assumptions, equations, worked examples, figures, limitations, and interpretations must not disappear because they do not align with a section boundary. Use `coverage_notes` to explain intentional omission or reference-only treatment.
 
-## 8. Textbook-subchapter mode
+## 9. Textbook-subchapter mode
 
 When `source_document.classification.kind` is `textbook_subchapter`, the ingestion layer has already scoped the intended numbered subchapter. Treat the supplied blocks and figure assets as the complete authoritative scope. Do not restore excluded adjacent sections.
 
@@ -94,7 +103,7 @@ For a short self-contained subchapter, prefer one coherent video unless conceptu
 
 The planned stack should read as a miniature lesson rather than a summary: orient -> explain -> bridge -> interpret -> check -> conclude.
 
-## 9. Planning self-audit
+## 10. Planning self-audit
 
 Before returning the plan, silently verify:
 - Does every lesson have a strong big-picture introduction rather than a thin agenda?

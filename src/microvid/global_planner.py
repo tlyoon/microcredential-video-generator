@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 from .llm import JSONLLMProvider, LLMError
+from .video_ids import canonical_video_id, is_canonical_video_id
 
 
 def _read_prompt(name: str) -> str:
@@ -61,7 +62,7 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
     video = {
         "type": "object",
         "properties": {
-            "id": {"type": "string"},
+            "id": {"type": "string", "description": "Structural lesson ID. Use canonical sequential IDs V01, V02, V03, ...; do not use semantic slugs."},
             "title": {"type": "string"},
             "focus": {"type": "string"},
             "target_minutes": {"type": "number", "minimum": 2, "maximum": 20},
@@ -76,7 +77,7 @@ def global_course_plan_schema(max_videos: int = 30) -> dict[str, Any]:
             "takeaways": {"type": "array", "items": {"type": "string"}},
             "core_block_ids": {"type": "array", "minItems": 1, "items": {"type": "string"}},
             "reference_block_ids": {"type": "array", "items": {"type": "string"}},
-            "prerequisite_video_ids": {"type": "array", "items": {"type": "string"}},
+            "prerequisite_video_ids": {"type": "array", "items": {"type": "string"}, "description": "Canonical IDs of earlier prerequisite lessons, e.g. V01."},
             "already_taught": {"type": "array", "items": {"type": "string"}},
             "forward_links": {"type": "array", "items": {"type": "string"}},
         },
@@ -176,6 +177,7 @@ def _planning_context(extraction: dict, profile: dict) -> dict[str, Any]:
             "preserve_worked_examples_as_reasoning_units": True,
             "avoid_redundant_reteaching": True,
             "require_source_provenance": True,
+            "required_video_id_format": "V01, V02, V03, ... in lesson order; IDs are structural, never semantic slugs",
             "textbook_subchapter_mode": is_textbook,
             "textbook_slide_stack_requirements": (
                 ["title", "introduction", "conceptual check question", "conclusion"]
@@ -186,6 +188,67 @@ def _planning_context(extraction: dict, profile: dict) -> dict[str, Any]:
         "whole_document_blocks": packet,
     }
 
+
+
+def _canonicalize_generated_video_ids(generated: dict) -> tuple[dict, list[dict[str, Any]]]:
+    """Force LLM-planned lesson IDs to the package-wide V01/V02/... contract.
+
+    Gemini is free to invent semantic labels during planning, but downstream filenames,
+    slide IDs, media rendering, and publishing use numeric lesson IDs. Canonicalize once
+    at the planning boundary and rewrite prerequisite references using the same mapping.
+    """
+    normalized = dict(generated)
+    videos = [dict(video) for video in generated.get("videos", [])]
+    raw_ids = [str(video.get("id", "")).strip() for video in videos]
+    duplicate_raw_ids = sorted({x for x in raw_ids if x and raw_ids.count(x) > 1})
+    if duplicate_raw_ids:
+        raise LLMError(
+            "Gemini global course plan returned duplicate lesson IDs before canonicalization: "
+            f"{duplicate_raw_ids}"
+        )
+
+    canonical_ids = [canonical_video_id(i) for i in range(1, len(videos) + 1)]
+    raw_to_canonical = {raw: canonical for raw, canonical in zip(raw_ids, canonical_ids) if raw}
+    changes: list[dict[str, str]] = []
+
+    for video, raw_id, canonical_id in zip(videos, raw_ids, canonical_ids):
+        if raw_id != canonical_id:
+            changes.append({"from": raw_id or "<missing>", "to": canonical_id})
+        video["id"] = canonical_id
+
+    unknown_refs: list[dict[str, str]] = []
+    for video in videos:
+        rewritten: list[str] = []
+        for value in video.get("prerequisite_video_ids", []) or []:
+            raw_ref = str(value).strip()
+            if raw_ref in raw_to_canonical:
+                mapped = raw_to_canonical[raw_ref]
+            elif raw_ref in canonical_ids:
+                mapped = raw_ref
+            else:
+                unknown_refs.append({"video_id": video["id"], "reference": raw_ref})
+                continue
+            if mapped not in rewritten:
+                rewritten.append(mapped)
+        video["prerequisite_video_ids"] = rewritten
+
+    if unknown_refs:
+        raise LLMError(
+            "Gemini global course plan contains prerequisite_video_ids that cannot be mapped "
+            f"to planned lessons: {unknown_refs}"
+        )
+
+    normalized["videos"] = videos
+    findings: list[dict[str, Any]] = []
+    if changes:
+        findings.append(
+            {
+                "severity": "warning",
+                "message": "LLM lesson IDs were normalized to canonical sequential V## IDs.",
+                "video_id_changes": changes,
+            }
+        )
+    return normalized, findings
 
 def validate_global_plan(plan: dict, extraction: dict) -> list[dict[str, Any]]:
     valid_ids = {str(b.get("id")) for b in extraction.get("blocks", [])}
@@ -198,13 +261,42 @@ def validate_global_plan(plan: dict, extraction: dict) -> list[dict[str, Any]]:
         issues.append({"severity": "error", "message": "Global plan contains no videos."})
         return issues
 
-    for video in videos:
+    all_video_ids = [str(video.get("id", "")) for video in videos]
+    for position, video in enumerate(videos):
         video_id = str(video.get("id", ""))
         if not video_id:
             issues.append({"severity": "error", "message": "A planned video has no id."})
+        elif not is_canonical_video_id(video_id):
+            issues.append({
+                "severity": "error",
+                "video_id": video_id,
+                "message": "Video id is not canonical; expected sequential IDs such as V01, V02, ...",
+            })
+        elif video_id != canonical_video_id(position + 1):
+            issues.append({
+                "severity": "error",
+                "video_id": video_id,
+                "message": f"Video id does not match lesson order; expected {canonical_video_id(position + 1)}.",
+            })
         elif video_id in seen_video_ids:
             issues.append({"severity": "error", "video_id": video_id, "message": "Duplicate video id."})
         seen_video_ids.add(video_id)
+
+        prerequisites = [str(x) for x in video.get("prerequisite_video_ids", [])]
+        invalid_prereqs = [x for x in prerequisites if x not in all_video_ids]
+        if invalid_prereqs:
+            issues.append({
+                "severity": "error",
+                "video_id": video_id,
+                "message": f"Unknown prerequisite video IDs: {invalid_prereqs}",
+            })
+        later_or_self = [x for x in prerequisites if x in all_video_ids[position:]]
+        if later_or_self:
+            issues.append({
+                "severity": "error",
+                "video_id": video_id,
+                "message": f"Prerequisites must refer only to earlier lessons: {later_or_self}",
+            })
 
         core = [str(x) for x in video.get("core_block_ids", [])]
         refs = [str(x) for x in video.get("reference_block_ids", [])]
@@ -262,14 +354,15 @@ def _normalize_plan(
     provider: JSONLLMProvider,
     passes: int,
 ) -> dict:
-    issues = validate_global_plan(generated, extraction)
+    canonicalized, id_findings = _canonicalize_generated_video_ids(generated)
+    issues = validate_global_plan(canonicalized, extraction)
     errors = [x for x in issues if x.get("severity") == "error"]
     if errors:
         raise LLMError(f"Gemini global course plan failed deterministic validation: {errors}")
 
     course = profile.get("course", {})
-    normalized = dict(generated)
-    normalized["videos"] = [dict(video) for video in generated.get("videos", [])]
+    normalized = dict(canonicalized)
+    normalized["videos"] = [dict(video) for video in canonicalized.get("videos", [])]
     for video in normalized["videos"]:
         video["max_slides"] = max(5, int(video.get("max_slides", 5)))
     normalized.update(
@@ -285,7 +378,8 @@ def _normalize_plan(
                 "passes": passes,
                 "prompt_set": "global_design_v1",
             },
-            "deterministic_findings": issues,
+            "deterministic_findings": id_findings + issues,
+            "video_id_policy": "canonical_sequential_v1",
         }
     )
     return normalized
@@ -315,6 +409,9 @@ def build_global_course_plan(
     if not review_pass:
         return first
 
+    reviewable_first = dict(first_raw)
+    reviewable_first["videos"] = first["videos"]
+
     review_prompt = "\n\n".join(
         [
             _read_prompt("system_microcredential_architect.md"),
@@ -323,7 +420,7 @@ def build_global_course_plan(
             + json.dumps(context, ensure_ascii=False, indent=2)
             + "\n```",
             "## FIRST GLOBAL COURSE PLAN\n```json\n"
-            + json.dumps(first_raw, ensure_ascii=False, indent=2)
+            + json.dumps(reviewable_first, ensure_ascii=False, indent=2)
             + "\n```",
             "## LOCAL PLAN QA FINDINGS\n```json\n"
             + json.dumps(first.get("deterministic_findings", []), ensure_ascii=False, indent=2)

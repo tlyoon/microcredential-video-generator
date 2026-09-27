@@ -4,6 +4,8 @@ from pathlib import Path
 
 import yaml
 
+from .video_ids import parse_canonical_video_id
+
 
 def _load(path: Path) -> dict:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -21,7 +23,7 @@ def write_text_assets(manifest_path: str | Path, workspace: str | Path) -> None:
     manifest_path = Path(manifest_path)
     workspace = Path(workspace)
     m = _load(manifest_path)
-    num = int(m["video_id"][1:])
+    num = parse_canonical_video_id(m.get("video_id"))
     notes_dir = workspace / "notes"
     narr_dir = workspace / "narration"
     srt_dir = workspace / "subtitles"
