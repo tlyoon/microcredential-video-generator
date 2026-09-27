@@ -121,6 +121,24 @@ Figure rules:
 The extraction layer supplies cropped figure assets from the PDF. Choose the crop only when its relevant labels/axes/annotations are sufficiently complete and it clearly corresponds to the intended concept. If the supplied crop is ambiguous, truncated, mismatched, or unusable, do not guess which nearby figure belongs; omit it safely and record an `editorial_flag`.
 
 A figure must have a teaching purpose. Do not paste it as decoration.
+## F2. Systematic figure preflight and SlidePlan (MicroGen-derived discipline)
+
+Before emitting the structured lesson, construct an internal `SlidePlan`. This is mandatory planning, not output. Include one plan entry for every major definition, law/property, central equation, nontrivial derivation step, worked example, misconception/caution, conceptual check, relevant figure, and conclusion takeaway that must survive from the assigned source.
+
+Also perform an internal `FigureMap` over every item in `available_figures`:
+- inspect caption, context, `scope_relation`, and `scope_distance_blocks`;
+- inspect `width_px`, `height_px`, `aspect_ratio`, `orientation`, `recommended_layout_hint`, and `recommended_columns_layout`;
+- decide whether the figure is central, supporting, irrelevant, ambiguous, or belongs substantively to an adjacent section;
+- if selected, assign it to the exact slide where the learner needs it and select a layout that makes labels readable;
+- preserve aspect ratio and bounded-box behavior; never plan stretching or distortion;
+- if the figure would be unreadably small beside the required explanation, reduce visible text or split the explanation into an immediate figure-focused slide rather than shrinking the figure.
+
+A figure marked `before_target` or `after_target` is not automatically forbidden. It may be used when its caption/context directly illustrates a relationship already inside the target lesson. Do not use it to introduce new adjacent-section theory. When in doubt, omit it and explain why.
+
+If `available_figures` is non-empty and you select none, set top-level `figure_omission_reason` to a specific pedagogical/source-boundary reason. Never silently omit every figure candidate. If at least one figure is selected, `figure_omission_reason` should normally be empty.
+
+Think of figures as explanatory objects. A selected graph should be inspected for axes, slope, extrema, regions, or trends; a physical diagram for arrows, labels, geometry, or configuration. The narration must explicitly guide the learner's eyes to the feature that carries the reasoning.
+
 ## G. Narration must teach what the learner is looking at
 
 Write first-pass narration as spoken instruction synchronized to the current slide.
@@ -182,7 +200,7 @@ Use this minimum architecture:
 4. `check` — a reasoning question that strengthens conceptual understanding.
 5. `conclusion` — final slide; concise synthesis.
 
-After the textbook title card, leave the `title` field empty on subsequent slides when required by the renderer; visible teaching content belongs in `onscreen`, structured visuals, figures, or `equation_latex`.
+After the textbook title card, keep the `title` field empty on ordinary teaching slides so the visual hierarchy stays clean. The sole exception is the final `conclusion` slide, whose `title` must be exactly `Conclusion` so the learner can immediately recognize closure.
 ## L. Final synchronized self-audit
 
 Before returning the structured lesson, silently inspect the complete slide+narration sequence and repair violations:

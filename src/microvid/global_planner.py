@@ -153,7 +153,15 @@ def _planning_context(extraction: dict, profile: dict) -> dict[str, Any]:
                     "caption": figure.get("caption", ""),
                     "context": figure.get("context", ""),
                     "group_label": figure.get("group_label"),
+                    "scope_relation": figure.get("scope_relation"),
+                    "scope_distance_blocks": figure.get("scope_distance_blocks"),
+                    "width_px": figure.get("width_px"),
+                    "height_px": figure.get("height_px"),
                     "aspect_ratio": figure.get("aspect_ratio"),
+                    "orientation": figure.get("orientation"),
+                    "recommended_layout_hint": figure.get("recommended_layout_hint"),
+                    "recommended_columns_layout": figure.get("recommended_columns_layout"),
+                    "fit_policy": figure.get("fit_policy"),
                 }
                 for figure in extraction.get("figure_assets", []) or []
             ],

@@ -49,6 +49,8 @@ def _prompt_payload(context: dict[str, Any], manifest: dict) -> dict[str, Any]:
         "lesson": context.get("lesson"),
         "authoritative_core_blocks": context.get("authoritative_core_blocks", []),
         "reference_blocks": context.get("reference_blocks", []),
+        "slide_count": len(manifest.get("slides", [])),
+        "narration_authority": "fixed_lesson_manifest_visible_content",
         "fixed_lesson_manifest": {
             "video_id": manifest.get("video_id"),
             "title": manifest.get("title"),

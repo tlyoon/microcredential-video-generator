@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import math
 import re
@@ -542,11 +542,17 @@ def _build_textbook_content_slide(prs: Presentation, manifest_path: Path, item: 
     slide = prs.slides.add_slide(prs.slide_layouts[5])
     figure_paths = _resolve_figure_paths(manifest_path, item)
     hint = str(item.get("figure_layout_hint", "auto"))
+    if hint == "auto" and item.get("figure_assets"):
+        hint = str((item.get("figure_assets") or [{}])[0].get("recommended_layout_hint") or "auto")
     lines = [str(x) for x in item.get("onscreen", [])]
     visual_type = str(item.get("visual_type", "auto") or "auto")
     panels = item.get("visual_panels", []) or []
     headers = [str(x) for x in item.get("table_headers", []) or []]
     rows = item.get("table_rows", []) or []
+    is_conclusion = str(item.get("slide_type", "")) == "conclusion"
+    content_top = 1.62 if is_conclusion else _TEXTBOOK_CONTENT_TOP
+    if is_conclusion:
+        _add_title(slide, "Conclusion")
 
     if figure_paths:
         if len(figure_paths) == 1 and (hint == "image_large" or len(" ".join(lines)) <= 90):
@@ -568,13 +574,13 @@ def _build_textbook_content_slide(prs: Presentation, manifest_path: Path, item: 
                 slide,
                 item,
                 0.95,
-                _TEXTBOOK_CONTENT_TOP,
+                content_top,
                 11.4,
                 lead_h,
                 has_figure=False,
                 show_equation=False,
             )
-        table_y = _TEXTBOOK_CONTENT_TOP + lead_h + (_REGION_GAP if lead_h else 0.0)
+        table_y = content_top + lead_h + (_REGION_GAP if lead_h else 0.0)
         equation_h = 1.05 if item.get("equation_latex") else 0.0
         _add_table(
             slide,
@@ -588,7 +594,7 @@ def _build_textbook_content_slide(prs: Presentation, manifest_path: Path, item: 
         if item.get("equation_latex"):
             _add_equation_footer(slide, str(item["equation_latex"]), top=_SLIDE_BOTTOM - 0.95)
     elif visual_type == "equation_focus":
-        _add_equation_focus(slide, item, content_top=_TEXTBOOK_CONTENT_TOP)
+        _add_equation_focus(slide, item, content_top=content_top)
     elif visual_type in {"process", "comparison", "diagram"} and panels:
         equation_h = 1.05 if item.get("equation_latex") else 0.0
         lead_h = _lead_region_height(lines, 11.4, preferred_font_size=24, maximum=2.0)
@@ -597,13 +603,13 @@ def _build_textbook_content_slide(prs: Presentation, manifest_path: Path, item: 
                 slide,
                 item,
                 0.95,
-                _TEXTBOOK_CONTENT_TOP,
+                content_top,
                 11.4,
                 lead_h,
                 has_figure=False,
                 show_equation=False,
             )
-        panel_y = _TEXTBOOK_CONTENT_TOP + lead_h + (_REGION_GAP if lead_h else 0.0)
+        panel_y = content_top + lead_h + (_REGION_GAP if lead_h else 0.0)
         _add_panel_grid(
             slide,
             panels,
@@ -616,7 +622,9 @@ def _build_textbook_content_slide(prs: Presentation, manifest_path: Path, item: 
         if item.get("equation_latex"):
             _add_equation_footer(slide, str(item["equation_latex"]), top=_SLIDE_BOTTOM - 0.95)
     else:
-        _add_body(slide, item, 0.95, 0.85, 11.45, 5.95, has_figure=False)
+        body_y = 1.72 if is_conclusion else 0.85
+        body_h = 5.05 if is_conclusion else 5.95
+        _add_body(slide, item, 0.95, body_y, 11.45, body_h, has_figure=False)
 
     _add_notes(slide, item)
     return slide

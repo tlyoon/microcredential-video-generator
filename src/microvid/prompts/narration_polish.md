@@ -37,6 +37,22 @@ If the source remains ambiguous, do not repair it from memory. Use scientificall
 
 Engagement must come from better explanation of supported material, not from invented content.
 
+## 1B. The fixed slide stack is the narration authority
+
+Follow the same slide-first discipline used in the stronger legacy production workflow: the fixed lesson manifest represents what the learner actually sees and is the primary authority for narration order and per-slide emphasis. The source blocks are supporting background for explaining that visible content; they are not permission to lecture about additional source material that is absent from the current slide.
+
+The input explicitly provides `slide_count`. Return exactly one narration item for every fixed slide ID, no more and no fewer, in the same slide order.
+
+For each slide:
+- explain only the concept, equation, figure, table, diagram, comparison, or check actually represented on that slide;
+- do not import interesting but non-visible neighbouring material merely because it exists in source context;
+- do not repeat visible titles or bullet text as narration;
+- if a figure is present, briefly orient the learner to what it depicts, then direct attention to the exact feature that advances the explanation;
+- if an equation is visible, verbalize it naturally and explain what it means rather than reciting notation;
+- preserve continuity with the preceding slide without announcing slide numbers or production structure.
+
+This separation is deliberate: slide generation decides **what is shown**; narration polish decides **how to teach what is shown**. Do not blur those responsibilities.
+
 ## 2. Treat attention as a design constraint
 
 Continuously ask internally: What is the learner wondering now? What remains unresolved? What should the learner notice before the explanation? Which part deserves attention? Is the learner following a line of reasoning or merely hearing facts?
@@ -226,7 +242,9 @@ A strong conclusion normally performs three moves:
 2. connect that answer to the formal relationship or visual model developed in the lesson;
 3. state what the learner can now infer, predict, interpret, or explain.
 
-Keep it concise. Do not introduce new scientific content. Do not restart the lesson.
+Keep it concise. Do not introduce new scientific content. Do not restart the lesson. The final narration must map directly onto the visible `Conclusion` takeaways and explicitly close the intellectual loop opened in the introduction.
+
+Maintain scientific precision when using intuitive language. For potential-energy landscapes, distinguish the **direction of force** from the **actual direction of motion**: a conservative force points toward decreasing potential energy, but an object with sufficient kinetic energy may temporarily move toward higher potential. Never turn a force-direction statement into an unsupported claim that all motion must always proceed downhill.
 
 Whenever possible, end with a durable mental model rather than a generic sentence such as “These are the key points to remember.”
 

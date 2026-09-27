@@ -94,6 +94,9 @@ def test_narration_polish_changes_only_spoken_fields_and_records_metrics():
     assert '"visual_panels"' in provider.prompt
     assert '"table_headers"' in provider.prompt
     assert '"table_rows"' in provider.prompt
+    assert '"slide_count": 2' in provider.prompt
+    assert '"narration_authority": "fixed_lesson_manifest_visible_content"' in provider.prompt
+    assert "fixed slide stack is the narration authority" in provider.prompt
     assert polished["slides"][0]["title"] == original_title
     assert polished["slides"][0]["source_block_ids"] == original_source_ids
     assert polished["slides"][0]["narration"].startswith("Focus on the larger contribution")
