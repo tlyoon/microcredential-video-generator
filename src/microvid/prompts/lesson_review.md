@@ -64,6 +64,8 @@ A learner should know what to inspect within a few seconds.
 
 For textbook figures, inspect `available_figures` before accepting a figure-free revision. Any candidate marked `recommended_for_target: true` must be used on at least one pedagogically appropriate slide. An adjacent caption is not grounds for omission when the candidate explicitly cross-references the target subsection. Use only the part of its meaning that is already supported by the target lesson; do not teach unrelated material from the neighboring subsection.
 
+Treat `figure_context_block_ids` as visual provenance, not academic claim provenance. Do not place an adjacent figure's context IDs into slide `source_block_ids` unless those IDs are also among the supplied authoritative core/reference blocks. Preserve target-section provenance for the explanation while retaining the figure through `figure_ids`.
+
 ## 7. Mathematics and worked reasoning
 
 If an equation is central, use `equation_focus` or another layout that gives it adequate visual space and pairs it with a compact interpretation. Preserve exact source-supported mathematics in `equation_latex`.

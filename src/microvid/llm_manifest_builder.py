@@ -90,7 +90,7 @@ def _figure_packet(figures: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "recommended_layout_hint": figure.get("recommended_layout_hint"),
             "recommended_columns_layout": figure.get("recommended_columns_layout"),
             "fit_policy": figure.get("fit_policy"),
-            "source_block_ids": figure.get("source_block_ids", []),
+            "figure_context_block_ids": figure.get("source_block_ids", []),
         }
         for figure in figures
     ]
@@ -356,17 +356,34 @@ def _normalize_manifest(
     normalized = []
     for i, slide in enumerate(slides, start=1):
         ids = [str(x) for x in slide.get("source_block_ids", [])]
-        invalid = [x for x in ids if x not in valid_ids]
-        if invalid:
-            raise LLMError(
-                f"LLM returned source block IDs not supplied to the lesson: {invalid}. "
-                "Generation rejected."
-            )
         figure_ids = [str(x) for x in slide.get("figure_ids", [])]
         invalid_figures = [x for x in figure_ids if x not in valid_figure_ids]
         if invalid_figures:
             raise LLMError(
                 f"LLM returned figure IDs not supplied to the lesson: {invalid_figures}. "
+                "Generation rejected."
+            )
+
+        # Figure-context block IDs describe where a crop/caption was discovered. For an
+        # adjacent but explicitly target-relevant figure, those IDs may lie outside the
+        # academic lesson scope. They are visual provenance, not permission to import
+        # adjacent-section prose into slide claims. Strip only those known figure-context
+        # IDs if the LLM accidentally copied them into source_block_ids; retain any truly
+        # unknown ID as a hard error.
+        figure_context_ids = {
+            str(block_id)
+            for figure_id in figure_ids
+            for block_id in (figure_by_id.get(figure_id, {}).get("source_block_ids", []) or [])
+        }
+        invalid = [x for x in ids if x not in valid_ids]
+        if invalid:
+            removable_figure_context = set(invalid) & figure_context_ids
+            if removable_figure_context:
+                ids = [x for x in ids if x not in removable_figure_context]
+            invalid = [x for x in ids if x not in valid_ids]
+        if invalid:
+            raise LLMError(
+                f"LLM returned source block IDs not supplied to the lesson: {invalid}. "
                 "Generation rejected."
             )
         source_blocks = [block_by_id[x] for x in ids if x in block_by_id]
@@ -397,6 +414,7 @@ def _normalize_manifest(
                 "estimated_seconds": int(slide.get("estimated_seconds", 30)),
                 "equation_latex": slide.get("equation_latex"),
                 "figure_ids": figure_ids,
+                "figure_context_block_ids": sorted(figure_context_ids),
                 "figure_layout_hint": slide.get("figure_layout_hint", "auto"),
                 "figure_assets": [figure_by_id[x] for x in figure_ids if x in figure_by_id],
             }
