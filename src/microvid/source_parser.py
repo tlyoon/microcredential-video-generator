@@ -62,7 +62,10 @@ def write_extraction(
     if raw is not None and isinstance(scope, dict) and scope.get("applied"):
         figures_dir = destination.parent / "figures"
         payload["figure_assets"] = extract_textbook_figure_assets(
-            payload.get("source", path), payload, figures_dir
+            payload.get("source", path),
+            payload,
+            figures_dir,
+            raw_extraction=raw,
         )
     else:
         payload.setdefault("figure_assets", [])

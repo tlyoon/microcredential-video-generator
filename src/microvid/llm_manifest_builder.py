@@ -77,7 +77,15 @@ def _figure_packet(figures: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "caption": figure.get("caption", ""),
             "context": figure.get("context", ""),
             "group_label": figure.get("group_label"),
+            "scope_relation": figure.get("scope_relation"),
+            "scope_distance_blocks": figure.get("scope_distance_blocks"),
+            "width_px": figure.get("width_px"),
+            "height_px": figure.get("height_px"),
             "aspect_ratio": figure.get("aspect_ratio"),
+            "orientation": figure.get("orientation"),
+            "recommended_layout_hint": figure.get("recommended_layout_hint"),
+            "recommended_columns_layout": figure.get("recommended_columns_layout"),
+            "fit_policy": figure.get("fit_policy"),
             "source_block_ids": figure.get("source_block_ids", []),
         }
         for figure in figures
@@ -173,6 +181,7 @@ def lesson_manifest_schema(max_slides: int, min_slides: int = 5) -> dict[str, An
                 "items": slide_schema,
             },
             "editorial_flags": {"type": "array", "items": {"type": "string"}},
+            "figure_omission_reason": {"type": "string"},
         },
         "required": ["lesson_title", "learning_outcomes", "slides", "editorial_flags"],
         "additionalProperties": False,
@@ -404,6 +413,7 @@ def _normalize_manifest(
         "source_reference_blocks": [b["id"] for b in refs],
         "editorial_status": "automated_ready",
         "editorial_flags": generated.get("editorial_flags", []),
+        "figure_omission_reason": str(generated.get("figure_omission_reason", "") or "").strip(),
         "generation": {
             "mode": "llm",
             "design_mode": design_mode,

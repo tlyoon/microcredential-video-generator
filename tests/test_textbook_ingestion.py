@@ -109,7 +109,7 @@ def _textbook_manifest(slide_types):
             {
                 "id": f"V01S{i:02d}",
                 "slide_type": slide_type,
-                "title": lesson_title if i == 1 else "",
+                "title": lesson_title if i == 1 else ("Conclusion" if slide_type == "conclusion" else ""),
                 "narration": "Explain the concept clearly.",
                 "onscreen": [] if i == 1 else ["Concise content"],
                 "source_block_ids": ["b0003"] if slide_type == "concept" else [],

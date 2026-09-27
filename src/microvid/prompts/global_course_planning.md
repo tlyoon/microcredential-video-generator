@@ -95,6 +95,21 @@ For every planned video provide the schema-required fields faithfully, including
 
 Do not put administrative boilerplate, contents text, duplicated wording, or reference-only material into a video merely for completeness. However, substantive concepts, assumptions, equations, worked examples, figures, limitations, and interpretations must not disappear because they do not align with a section boundary. Use `coverage_notes` to explain intentional omission or reference-only treatment.
 
+## MicroGen-derived visual preflight and coverage audit
+
+Before deciding lesson boundaries, perform an internal visual/content audit analogous to a production preflight. Do not print it, but use it to drive the plan:
+
+- `CoverageMap`: the target concepts/equations/examples that must survive into the lesson sequence.
+- `GapList`: suspected omissions, compressed transitions, or source artefacts that would otherwise break the teaching chain.
+- `FigureMap`: every supplied figure candidate, its page/caption/context, and whether it is `within_target`, `before_target`, or `after_target`.
+- `FigureLayoutAudit`: width, height, aspect ratio, orientation, recommended layout hint, and whether a figure needs a dedicated or two-column-style teaching surface.
+
+Figure discovery has already occurred before final subchapter scoping. Therefore `available_figures` may include a figure whose caption is just outside the target boundary but on a page touched by the target. Treat boundary relation as evidence, not as an automatic inclusion/exclusion rule.
+
+A `before_target` or `after_target` figure may be planned only when its caption/context directly clarifies an idea explicitly taught by the target lesson and using it does not import the neighbouring subsection's new teaching content. This is especially appropriate when a nearby graph or diagram visually explains an equation, slope, geometry, apparatus, or physical relationship already established in the target. Otherwise omit it.
+
+For every planned lesson with figure candidates, decide figure use during planning rather than as a late decoration. If no candidate is pedagogically appropriate, preserve that decision for the lesson-generation stage so it can be explained explicitly rather than silently dropping all figures.
+
 ## 9. Textbook-subchapter mode
 
 When `source_document.classification.kind` is `textbook_subchapter`, the ingestion layer has already scoped the intended numbered subchapter. Treat the supplied blocks and figure assets as the complete authoritative scope. Do not restore excluded adjacent sections.

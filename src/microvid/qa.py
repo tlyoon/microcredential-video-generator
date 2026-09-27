@@ -174,12 +174,23 @@ def validate_manifest(m: dict) -> list[dict]:
             issues.append({"severity": "error", "message": "Textbook title slide must contain only the exact title."})
         if len(slides) < 2 or slides[1].get("slide_type") != "introduction":
             issues.append({"severity": "error", "message": "Textbook subchapter must include an introduction slide immediately after the title."})
-        if any(str(slide.get("title", "")).strip() for slide in slides[1:]):
-            issues.append({"severity": "error", "message": "Textbook slides after Slide 1 must not contain visible slide titles."})
+        middle_titles = [
+            str(slide.get("title", "")).strip()
+            for slide in slides[1:-1]
+            if str(slide.get("title", "")).strip()
+        ]
+        if middle_titles:
+            issues.append({"severity": "error", "message": "Textbook teaching slides between the title card and conclusion must not contain visible slide titles."})
         if not slides or slides[-1].get("slide_type") != "conclusion":
             issues.append({"severity": "error", "message": "Textbook subchapter must end with a conclusion slide."})
+        elif str(slides[-1].get("title", "")).strip() != "Conclusion":
+            issues.append({"severity": "error", "message": "Textbook conclusion slide must use the visible title 'Conclusion'."})
         if m.get("figure_assets") and not any(slide.get("figure_ids") for slide in slides):
-            issues.append({"severity": "error", "message": "Relevant textbook figure assets are available but none are used in the lesson."})
+            reason = str(m.get("figure_omission_reason", "") or "").strip()
+            if not reason:
+                issues.append({"severity": "error", "message": "Textbook figure candidates are available but none are used; give a specific figure_omission_reason or select a pedagogically relevant source figure."})
+            else:
+                issues.append({"severity": "warning", "message": f"All available figure candidates were omitted: {reason}"})
     if len(slides) > 9:
         issues.append({"severity": "warning", "message": f"High slide count: {len(slides)}."})
     valid_figure_ids = {str(item.get("id")) for item in m.get("figure_assets", []) or []}
