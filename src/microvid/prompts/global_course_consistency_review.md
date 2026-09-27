@@ -41,7 +41,7 @@ For ordinary structured DOCX/PDF lessons, verify that each LLM-generated lesson 
 For textbook-subchapter lessons, additionally verify:
 
 - title -> introduction -> concept development -> check -> conclusion structure;
-- only Slide 1 has a visible title;
+- Slide 1 has the exact lesson/subchapter title; ordinary teaching slides between the title card and final conclusion have empty title fields; the final `conclusion` slide must use the visible title `Conclusion`;
 - selected textbook figures are relevant, non-decorative, and given enough visual space;
 - narration briefly explains figures that appear;
 - no drift into excluded adjacent textbook sections;
