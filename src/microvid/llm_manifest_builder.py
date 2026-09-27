@@ -348,6 +348,7 @@ def _normalize_manifest(
     if not isinstance(slides, list):
         raise LLMError("LLM manifest 'slides' must be a list.")
 
+    is_textbook = (extraction.get("source_classification") or {}).get("kind") == "textbook_subchapter"
     normalized = []
     for i, slide in enumerate(slides, start=1):
         ids = [str(x) for x in slide.get("source_block_ids", [])]
@@ -365,11 +366,15 @@ def _normalize_manifest(
                 "Generation rejected."
             )
         source_blocks = [block_by_id[x] for x in ids if x in block_by_id]
+        slide_type = slide.get("slide_type")
+        title = slide.get("title", "")
+        if is_textbook and slide_type == "conclusion":
+            title = "Conclusion"
         normalized.append(
             {
                 "id": f"{lesson['id']}S{i:02d}",
-                "slide_type": slide.get("slide_type"),
-                "title": slide.get("title", ""),
+                "slide_type": slide_type,
+                "title": title,
                 "onscreen": slide.get("onscreen", []),
                 "narration": slide.get("narration", ""),
                 "lecturer_notes": slide.get("lecturer_notes", []),
